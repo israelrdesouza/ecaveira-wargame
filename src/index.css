@@ -3,35 +3,35 @@
 @layer base {
   html {
     scrollbar-width: thin;
-    scrollbar-color: rgba(239, 68, 68, 0.55) rgba(10, 10, 12, 0.8);
+    scrollbar-color: rgba(127, 29, 29, 0.48) rgba(10, 10, 12, 0.38);
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(239, 68, 68, 0.5) rgba(10, 10, 12, 0.72);
+    scrollbar-color: rgba(127, 29, 29, 0.42) rgba(10, 10, 12, 0.32);
   }
 
   *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   *::-webkit-scrollbar-track {
-    background: rgba(10, 10, 12, 0.82);
+    background: rgba(10, 10, 12, 0.36);
     border-radius: 999px;
   }
 
   *::-webkit-scrollbar-thumb {
-    border: 2px solid rgba(10, 10, 12, 0.82);
+    border: 1px solid rgba(10, 10, 12, 0.42);
     border-radius: 999px;
-    background: rgba(127, 29, 29, 0.82);
+    background: rgba(127, 29, 29, 0.56);
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(239, 68, 68, 0.78);
+    background: rgba(239, 68, 68, 0.74);
   }
 
   *::-webkit-scrollbar-corner {
-    background: rgba(10, 10, 12, 0.82);
+    background: rgba(10, 10, 12, 0.36);
   }
 }
