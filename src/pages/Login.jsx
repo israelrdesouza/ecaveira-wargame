@@ -2,15 +2,12 @@ import { ArrowLeft, Loader2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react
 import { useState } from 'react'
 import logo from '../assets/ecaveira-logo.png'
 
-function Login({ onBack, onSuccess, signIn, signUp }) {
-  const [mode, setMode] = useState('login')
+function Login({ onBack, onSuccess, signIn }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  const isSignUp = mode === 'signup'
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -18,8 +15,7 @@ function Login({ onBack, onSuccess, signIn, signUp }) {
     setError('')
     setMessage('')
 
-    const action = isSignUp ? signUp : signIn
-    const { data, error: authError } = await action(email, password)
+    const { error: authError } = await signIn(email, password)
 
     if (authError) {
       setError(authError.message)
@@ -27,21 +23,14 @@ function Login({ onBack, onSuccess, signIn, signUp }) {
       return
     }
 
-    if (isSignUp && !data.session) {
-      setMessage('Conta criada. Verifique seu e-mail para confirmar o acesso.')
-      setSubmitting(false)
-      return
-    }
-
-    setMessage(isSignUp ? 'Conta criada. Entrando no WarGame...' : 'Acesso liberado.')
+    setMessage('Acesso liberado.')
     setSubmitting(false)
     onSuccess()
   }
 
-  function toggleMode() {
-    setMode((current) => (current === 'login' ? 'signup' : 'login'))
+  function handleForgotPassword() {
     setError('')
-    setMessage('')
+    setMessage('Recuperação de senha será implementada em breve.')
   }
 
   return (
@@ -73,13 +62,13 @@ function Login({ onBack, onSuccess, signIn, signUp }) {
               />
             </div>
             <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-red-300">
-              {isSignUp ? 'Criar acesso' : 'Acesso operacional'}
+              Acesso operacional
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-white">
-              eCaveira WarGame
+              ÁREA RESTRITA
             </h1>
             <p className="mt-2 text-sm font-medium leading-6 text-zinc-500">
-              Entre para acessar o cockpit comercial.
+              Identifique-se para acessar o Cockpit Comercial.
             </p>
           </div>
 
@@ -112,7 +101,7 @@ function Login({ onBack, onSuccess, signIn, signUp }) {
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  autoComplete="current-password"
                   minLength={6}
                   required
                   placeholder="Sua senha"
@@ -140,15 +129,15 @@ function Login({ onBack, onSuccess, signIn, signUp }) {
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-red-600 px-5 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_30px_rgba(220,38,38,0.28)] transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {submitting && <Loader2 size={17} className="animate-spin" />}
-              {isSignUp ? 'Criar conta' : 'Entrar'}
+              Entrar
             </button>
 
             <button
               type="button"
-              onClick={toggleMode}
-              className="h-10 w-full rounded-md border border-white/10 text-sm font-black text-zinc-300 transition hover:border-red-500/30 hover:text-white"
+              onClick={handleForgotPassword}
+              className="mx-auto block h-8 w-fit px-2 text-xs font-bold text-zinc-500 transition hover:text-red-300"
             >
-              {isSignUp ? 'Já tenho conta' : 'Criar conta'}
+              Esqueci minha senha
             </button>
           </form>
         </div>
