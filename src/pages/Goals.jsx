@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { getGoalByMonth, upsertGoal } from '../services/goalService'
+import { getAnnualGoal, getGoalByMonth, upsertGoal } from '../services/goalService'
 import { getBusinessDaysForMonth } from '../utils/businessDays'
 import { formatCurrencyBRLWithCents, formatPercent } from '../utils/formatters'
 
@@ -29,10 +29,6 @@ const MONTHS = [
   { label: 'NOVEMBRO', value: '11' },
   { label: 'DEZEMBRO', value: '12' },
 ]
-
-const STANDARD_FINANCIAL_GOAL = 6083.33
-const STANDARD_FINANCIAL_GOAL_INPUT = '6.083,33'
-const STANDARD_FINANCIAL_GOAL_UNTIL = '12/2026'
 
 const defaultRates = {
   taxa_suspect_prospect: '30',
@@ -62,9 +58,9 @@ function getEmptyGoals(period = getCurrentPeriod()) {
   }
 }
 
-function getDefaultAttackPlan(days = 20) {
+function getDefaultAttackPlan(days = 20, annualGoalValue = 0) {
   return {
-    meta_financeira: STANDARD_FINANCIAL_GOAL_INPUT,
+    meta_financeira: formatNumberForInput(annualGoalValue),
     resultado_referencia: '0',
     fechamentos_referencia: '0',
     dias_uteis: String(days),
@@ -83,6 +79,9 @@ function Goals() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [businessDaysWarning, setBusinessDaysWarning] = useState('')
+  const [annualGoal, setAnnualGoal] = useState(null)
+  const [annualGoalWarning, setAnnualGoalWarning] = useState('')
+  const [annualGoalRefreshKey, setAnnualGoalRefreshKey] = useState(0)
   const periodKey = useMemo(() => `${goals.mes}-${goals.ano}`, [goals.mes, goals.ano])
   const plannedPeriod = useMemo(
     () => getPeriodLabel(goals.mes, goals.ano),
@@ -91,6 +90,11 @@ function Goals() {
   const referencePeriod = useMemo(
     () => getReferencePeriodLabel(goals.mes, goals.ano),
     [goals.mes, goals.ano],
+  )
+  const annualGoalValue = useMemo(() => getAnnualGoalValue(annualGoal), [annualGoal])
+  const annualGoalValidity = useMemo(
+    () => getAnnualGoalValidityLabel(annualGoal?.vigente_ate),
+    [annualGoal?.vigente_ate],
   )
   const ticketReference = useMemo(() => calculateTicketReference(attackPlan), [attackPlan])
   const referencePerformance = useMemo(
@@ -119,10 +123,12 @@ function Goals() {
       setError('')
       setSuccess('')
       setBusinessDaysWarning('')
+      setAnnualGoalWarning('')
 
       try {
-        const [goalData, businessDaysData] = await Promise.all([
+        const [goalData, annualGoalData, businessDaysData] = await Promise.all([
           getGoalByMonth(user.id, goals.mes, goals.ano),
+          getAnnualGoal(user.id, goals.ano),
           getBusinessDaysForMonth(Number(goals.ano), Number(goals.mes)),
         ])
 
@@ -131,6 +137,10 @@ function Goals() {
         }
 
         setBusinessDaysWarning(businessDaysData.warning)
+        setAnnualGoal(annualGoalData)
+        setAnnualGoalWarning(
+          annualGoalData ? '' : 'Meta anual não configurada para este ano.',
+        )
 
         if (goalData) {
           setGoals((current) => ({
@@ -141,7 +151,13 @@ function Goals() {
             meta_negociacao: String(goalData.meta_negociacao ?? 0),
             meta_fechamento: String(goalData.meta_fechamento ?? 0),
           }))
-          setAttackPlan(getAttackPlanFromGoal(goalData, businessDaysData.days))
+          setAttackPlan(
+            getAttackPlanFromGoal(
+              goalData,
+              businessDaysData.days,
+              getAnnualGoalValue(annualGoalData),
+            ),
+          )
           setIsLocked(true)
           setIsEditing(false)
         } else {
@@ -153,7 +169,12 @@ function Goals() {
             meta_negociacao: '',
             meta_fechamento: '',
           }))
-          setAttackPlan(getDefaultAttackPlan(businessDaysData.days))
+          setAttackPlan(
+            getDefaultAttackPlan(
+              businessDaysData.days,
+              getAnnualGoalValue(annualGoalData),
+            ),
+          )
           setIsLocked(false)
           setIsEditing(false)
         }
@@ -175,7 +196,21 @@ function Goals() {
     return () => {
       isMounted = false
     }
-  }, [periodKey, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periodKey, user?.id, annualGoalRefreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function handleAnnualGoalUpdated(event) {
+      if (String(event.detail?.ano) === String(goals.ano)) {
+        setAnnualGoalRefreshKey((current) => current + 1)
+      }
+    }
+
+    window.addEventListener('annual-goal-updated', handleAnnualGoalUpdated)
+
+    return () => {
+      window.removeEventListener('annual-goal-updated', handleAnnualGoalUpdated)
+    }
+  }, [goals.ano])
 
   function updateField(event) {
     const { name, value } = event.target
@@ -284,7 +319,7 @@ function Goals() {
         meta_negociacao: String(savedGoal.meta_negociacao ?? 0),
         meta_fechamento: String(savedGoal.meta_fechamento ?? 0),
       }))
-      setAttackPlan(getAttackPlanFromGoal(savedGoal, attackPlan.dias_uteis))
+      setAttackPlan(getAttackPlanFromGoal(savedGoal, attackPlan.dias_uteis, annualGoalValue))
       setIsLocked(true)
       setIsEditing(false)
       setSuccess('Metas mensais salvas com sucesso.')
@@ -316,9 +351,15 @@ function Goals() {
         </div>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MonthVisionCard label="Mês planejado" value={plannedPeriod} helper="Mês de execução" />
         <MonthVisionCard label="Referência" value={referencePeriod} helper="Base do ticket médio" />
+        <MonthVisionCard
+          label="Meta padrão"
+          value={formatCurrencyBRLWithCents(annualGoalValue)}
+          helper={annualGoal ? `Vigente até ${annualGoalValidity}` : 'Meta anual não configurada'}
+          accent
+        />
         <BusinessDaysContextCard
           value={attackPlan.dias_uteis}
           onChange={updateAttackField}
@@ -584,6 +625,12 @@ function Goals() {
           </div>
         )}
 
+        {annualGoalWarning && !isLoading && (
+          <div className="mt-5 rounded-md border border-amber-500/25 bg-amber-950/15 px-3 py-2 text-sm font-semibold text-amber-100">
+            {annualGoalWarning}
+          </div>
+        )}
+
         {!isEditMode && !isLoading && (
           <div className="mt-5 rounded-md border border-white/10 bg-black/25 px-3 py-2 text-sm font-semibold text-zinc-400">
             Metas bloqueadas. Clique em Editar metas para ajustar o Plano de Ataque.
@@ -839,9 +886,9 @@ function AttackResultCard({ label, value, accent = false }) {
   )
 }
 
-function getAttackPlanFromGoal(goal, fallbackDays) {
+function getAttackPlanFromGoal(goal, fallbackDays, annualGoalValue = 0) {
   return {
-    meta_financeira: formatNumberForInput(goal.meta_financeira ?? STANDARD_FINANCIAL_GOAL),
+    meta_financeira: formatNumberForInput(goal.meta_financeira ?? annualGoalValue),
     resultado_referencia: formatNumberForInput(goal.resultado_referencia ?? 0),
     fechamentos_referencia: String(goal.fechamentos_referencia ?? 0),
     dias_uteis: String(goal.dias_uteis ?? fallbackDays),
@@ -1010,6 +1057,35 @@ function formatNumberForInput(value) {
   }
 
   return String(number).replace('.', ',')
+}
+
+function getAnnualGoalValue(annualGoal) {
+  const value = Number(annualGoal?.meta_financeira_padrao)
+
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function getAnnualGoalValidityLabel(value) {
+  if (!value) {
+    return 'não definida'
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month] = value.split('-')
+    return `${month}/${year}`
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value)
+  }
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+  }).format(date)
 }
 
 function getPeriodLabel(month, year) {

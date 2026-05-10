@@ -50,6 +50,57 @@ export async function upsertGoal(userId, mes, ano, metas) {
   return data
 }
 
+export async function getAnnualGoal(userId, ano) {
+  const { data, error } = await supabase
+    .from('metas_anuais')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('ano', Number(ano))
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function upsertAnnualGoal(userId, annualGoalOrYear, maybeAnnualGoal) {
+  const annualGoal = maybeAnnualGoal ?? annualGoalOrYear
+  const ano = maybeAnnualGoal ? annualGoalOrYear : annualGoal.ano
+  const payload = {
+    user_id: userId,
+    ano: Number(ano),
+    meta_financeira_padrao: normalizeDecimalValue(annualGoal.meta_financeira_padrao),
+    vigente_ate: annualGoal.vigente_ate || null,
+    observacao: annualGoal.observacao || null,
+  }
+
+  const { data, error } = await supabase
+    .from('metas_anuais')
+    .upsert(payload, { onConflict: 'user_id,ano' })
+    .select('*')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function deleteAnnualGoal(userId, ano) {
+  const { error } = await supabase
+    .from('metas_anuais')
+    .delete()
+    .eq('user_id', userId)
+    .eq('ano', Number(ano))
+
+  if (error) {
+    throw error
+  }
+}
+
 function normalizeGoalValue(value) {
   const numericValue = parseLocalizedNumber(value)
 
