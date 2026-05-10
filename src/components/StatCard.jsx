@@ -6,6 +6,9 @@ function StatCard({
   detail,
   progress,
   meta,
+  onIconClick,
+  onDoubleClick,
+  iconTitle = 'Ver leads',
 }) {
   const accentClasses = {
     red: 'border-red-500/30 bg-red-950/30 text-red-300',
@@ -16,7 +19,10 @@ function StatCard({
   }
 
   return (
-    <article className="group min-w-0 rounded-lg border border-white/10 bg-zinc-900/70 p-4 shadow-xl shadow-black/20 backdrop-blur transition hover:-translate-y-0.5 hover:border-red-500/30 hover:bg-zinc-900/90">
+    <article
+      onDoubleClick={onDoubleClick}
+      className="group min-w-0 rounded-lg border border-white/10 bg-zinc-900/70 p-4 shadow-xl shadow-black/20 backdrop-blur transition hover:-translate-y-0.5 hover:border-red-500/30 hover:bg-zinc-900/90"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="max-w-full whitespace-normal break-words text-xs font-black uppercase leading-4 tracking-[0.12em] text-zinc-500">
@@ -31,11 +37,18 @@ function StatCard({
             )}
           </div>
         </div>
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border ${accentClasses[accent]}`}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onIconClick?.()
+          }}
+          title={iconTitle}
+          aria-label={iconTitle}
+          className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md border transition hover:scale-105 hover:border-red-400/50 hover:bg-red-950/25 focus:outline-none focus:ring-2 focus:ring-red-300/40 ${accentClasses[accent]}`}
         >
           <Icon size={21} strokeWidth={2.4} />
-        </div>
+        </button>
       </div>
 
       {detail && (

@@ -12,12 +12,14 @@ import {
   Plus,
   Radar,
   Trophy,
+  X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import StatCard from '../components/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { getDashboardData } from '../services/dashboardService'
-import { formatCurrencyBRL, formatDateBR } from '../utils/formatters'
+import { formatCurrencyBRL, formatDateBR, formatPhoneBR } from '../utils/formatters'
 
 const stageIconMap = {
   suspects: Radar,
@@ -35,6 +37,36 @@ const stageAccentMap = {
   fechamentos: 'green',
 }
 
+const stageDrilldownMap = {
+  suspects: {
+    stage: 'suspect',
+    title: 'Suspects',
+    subtitle: 'Leads cuja etapa atual é Suspect.',
+  },
+  prospects: {
+    stage: 'prospect',
+    title: 'Prospects',
+    subtitle: 'Leads cuja etapa atual é Prospect.',
+  },
+  demos: {
+    stage: 'demo',
+    title: 'Demos',
+    subtitle: 'Leads cuja etapa atual é Demo.',
+  },
+  negociacoes: {
+    stage: 'negociacao',
+    title: 'Negociações',
+    subtitle: 'Leads cuja etapa atual é Negociação.',
+  },
+  fechamentos: {
+    stage: 'fechado',
+    title: 'Fechamentos',
+    subtitle: 'Leads cuja etapa atual é Fechamento.',
+  },
+}
+
+const inactiveStages = new Set(['fechado', 'perdido'])
+
 function getCurrentPeriod() {
   const now = new Date()
 
@@ -50,6 +82,7 @@ function Dashboard({ onNavigate }) {
   const [dashboardData, setDashboardData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [drilldown, setDrilldown] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -90,6 +123,65 @@ function Dashboard({ onNavigate }) {
   const stages = dashboardData?.stages ?? []
   const auxiliary = dashboardData?.auxiliary
   const lists = dashboardData?.lists
+  const leads = dashboardData?.leads ?? []
+
+  function openDrilldown(config) {
+    if (!config) {
+      return
+    }
+
+    setDrilldown({
+      ...config,
+      leads: config.getLeads(leads),
+    })
+  }
+
+  function openStageDrilldown(stage) {
+    const config = stageDrilldownMap[stage.key]
+
+    openDrilldown({
+      title: config.title,
+      subtitle: config.subtitle,
+      getLeads: (currentLeads) =>
+        currentLeads.filter((lead) => lead.etapa_atual === config.stage),
+    })
+  }
+
+  function closeDrilldown() {
+    setDrilldown(null)
+  }
+
+  const auxiliaryDrilldowns = {
+    overdueFollowUps: {
+      title: 'Follow-ups vencidos',
+      subtitle: 'Leads ativos com próximo contato menor que hoje.',
+      getLeads: (currentLeads) => {
+        const today = getTodayISODate()
+        return currentLeads.filter(
+          (lead) =>
+            !inactiveStages.has(lead.etapa_atual) &&
+            lead.proximo_contato &&
+            lead.proximo_contato < today,
+        )
+      },
+    },
+    caveiraLeads: {
+      title: 'Leads Caveira',
+      subtitle: 'Leads ativos com temperatura Caveira.',
+      getLeads: (currentLeads) =>
+        currentLeads.filter(
+          (lead) => !inactiveStages.has(lead.etapa_atual) && lead.temperatura === 'caveira',
+        ),
+    },
+    todayMission: {
+      title: 'Missão do Dia',
+      subtitle: 'Leads com próximo contato marcado para hoje.',
+      getLeads: (currentLeads) => {
+        const today = getTodayISODate()
+        return currentLeads.filter((lead) => lead.proximo_contato === today)
+      },
+    },
+  }
 
   return (
     <section className="space-y-5 sm:space-y-6">
@@ -166,6 +258,9 @@ function Dashboard({ onNavigate }) {
             progress={stage.percentual}
             icon={stageIconMap[stage.key]}
             accent={stageAccentMap[stage.key]}
+            onIconClick={() => openStageDrilldown(stage)}
+            onDoubleClick={() => openStageDrilldown(stage)}
+            iconTitle="Ver leads"
           />
         ))}
         <StatCard
@@ -175,6 +270,9 @@ function Dashboard({ onNavigate }) {
           progress={Math.min((auxiliary?.overdueFollowUps ?? 0) * 10, 100)}
           icon={AlertTriangle}
           accent="red"
+          onIconClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
+          onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
+          iconTitle="Ver leads"
         />
         <StatCard
           label="Leads Caveira"
@@ -183,6 +281,9 @@ function Dashboard({ onNavigate }) {
           progress={Math.min((auxiliary?.caveiraLeads ?? 0) * 10, 100)}
           icon={Flame}
           accent="red"
+          onIconClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
+          onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
+          iconTitle="Ver leads"
         />
         <StatCard
           label="Missão do Dia"
@@ -191,6 +292,9 @@ function Dashboard({ onNavigate }) {
           progress={Math.min((auxiliary?.todayMission ?? 0) * 10, 100)}
           icon={BadgeCheck}
           accent="zinc"
+          onIconClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
+          onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
+          iconTitle="Ver leads"
         />
       </div>
 
@@ -283,6 +387,12 @@ function Dashboard({ onNavigate }) {
           )}
         </div>
       </article>
+
+      {drilldown &&
+        createPortal(
+          <DrilldownModal drilldown={drilldown} onClose={closeDrilldown} />,
+          document.body,
+        )}
     </section>
   )
 }
@@ -347,6 +457,159 @@ function PriorityTarget({ target }) {
   )
 }
 
+function DrilldownModal({ drilldown, onClose }) {
+  const records = drilldown.leads ?? []
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+      <article className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-lg border border-red-500/20 bg-zinc-950 shadow-2xl shadow-black/60">
+        <header className="flex items-start justify-between gap-4 border-b border-white/10 p-5 sm:p-6">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
+              Drilldown
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-white">{drilldown.title}</h2>
+            <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-zinc-500">
+              {drilldown.subtitle}
+            </p>
+            <p className="mt-3 w-fit rounded-md border border-white/10 bg-black/25 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-zinc-300">
+              {records.length} registro{records.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-400 transition hover:border-red-500/40 hover:text-white"
+            aria-label="Fechar drilldown"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="max-h-[68vh] overflow-y-auto p-4 sm:p-5">
+          {records.length === 0 ? (
+            <p className="rounded-md border border-white/10 bg-black/25 p-4 text-sm font-semibold text-zinc-400">
+              Nenhum lead encontrado para este indicador.
+            </p>
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="min-w-[1120px] w-full text-left">
+                  <thead className="border-b border-white/10 bg-black/25">
+                    <tr className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
+                      <th className="px-3 py-3">Empresa/Pessoa</th>
+                      <th className="px-3 py-3">Contato</th>
+                      <th className="px-3 py-3">Celular</th>
+                      <th className="px-3 py-3">Produto</th>
+                      <th className="px-3 py-3">Origem</th>
+                      <th className="px-3 py-3">Etapa</th>
+                      <th className="px-3 py-3">Temperatura</th>
+                      <th className="px-3 py-3">Próximo contato</th>
+                      <th className="px-3 py-3">Última ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {records.map((lead) => (
+                      <DrilldownTableRow key={lead.id} lead={lead} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-3 lg:hidden">
+                {records.map((lead) => (
+                  <DrilldownLeadCard key={lead.id} lead={lead} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </article>
+    </div>
+  )
+}
+
+function DrilldownTableRow({ lead }) {
+  return (
+    <tr className="text-sm text-zinc-300 transition hover:bg-white/[0.025]">
+      <td className="px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
+      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.contato || '-'}</td>
+      <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
+        {formatPhoneBR(lead.celular) || '-'}
+      </td>
+      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.produto || '-'}</td>
+      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.origem || '-'}</td>
+      <td className="px-3 py-3">
+        <SmallBadge>{formatStage(lead.etapa_atual)}</SmallBadge>
+      </td>
+      <td className="px-3 py-3">
+        <SmallBadge>{formatTemperature(lead.temperatura)}</SmallBadge>
+      </td>
+      <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
+        {lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
+      </td>
+      <td className="px-3 py-3 font-semibold text-zinc-400">
+        {lead.ultima_acao || lead.proxima_acao || '-'}
+      </td>
+    </tr>
+  )
+}
+
+function DrilldownLeadCard({ lead }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="break-words text-base font-black text-white">
+            {lead.empresa || '-'}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-zinc-400">
+            {lead.contato || 'Sem contato informado'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SmallBadge>{formatStage(lead.etapa_atual)}</SmallBadge>
+          <SmallBadge>{formatTemperature(lead.temperatura)}</SmallBadge>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 text-sm font-semibold text-zinc-400 sm:grid-cols-2">
+        <InfoLine label="Celular" value={formatPhoneBR(lead.celular) || '-'} />
+        <InfoLine label="Produto" value={lead.produto || '-'} />
+        <InfoLine label="Origem" value={lead.origem || '-'} />
+        <InfoLine
+          label="Próximo contato"
+          value={lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
+        />
+        <InfoLine
+          label="Última ação"
+          value={lead.ultima_acao || lead.proxima_acao || '-'}
+          wide
+        />
+      </div>
+    </div>
+  )
+}
+
+function InfoLine({ label, value, wide = false }) {
+  return (
+    <p className={wide ? 'sm:col-span-2' : undefined}>
+      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
+        {label}:{' '}
+      </span>
+      <span>{value}</span>
+    </p>
+  )
+}
+
+function SmallBadge({ children }) {
+  return (
+    <span className="inline-flex min-h-7 items-center rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1 text-xs font-black text-zinc-200">
+      {children || '-'}
+    </span>
+  )
+}
+
 function formatStage(stage) {
   const labels = {
     suspect: 'Suspect',
@@ -359,6 +622,21 @@ function formatStage(stage) {
   }
 
   return labels[stage] ?? stage
+}
+
+function formatTemperature(temperature) {
+  const labels = {
+    frio: 'Frio',
+    morno: 'Morno',
+    quente: 'Quente',
+    caveira: 'Caveira',
+  }
+
+  return labels[temperature] ?? temperature
+}
+
+function getTodayISODate() {
+  return new Date().toISOString().slice(0, 10)
 }
 
 export default Dashboard
