@@ -28,7 +28,11 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        window.sessionStorage.setItem('ecaveira_password_recovery', 'true')
+      }
+
       setSession(nextSession)
       setUser(nextSession?.user ?? null)
       setLoading(false)

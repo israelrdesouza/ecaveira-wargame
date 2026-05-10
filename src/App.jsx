@@ -7,6 +7,7 @@ import Leads from './pages/Leads'
 import Login from './pages/Login'
 import NewLead from './pages/NewLead'
 import Reports from './pages/Reports'
+import ResetPassword from './pages/ResetPassword'
 import { useAuth } from './hooks/useAuth'
 import { navItems } from './lib/navigation'
 
@@ -20,7 +21,8 @@ const pages = {
 
 function App() {
   const [currentPage, setCurrentPage] = useState('landing')
-  const { session, user, loading, signIn, signUp, signOut } = useAuth()
+  const { session, user, loading, signIn, signOut } = useAuth()
+  const isResetPasswordRoute = window.location.pathname === '/reset-password'
   const activePageId =
     session && (currentPage === 'landing' || currentPage === 'login')
       ? 'dashboard'
@@ -40,6 +42,10 @@ function App() {
     )
   }
 
+  if (isResetPasswordRoute) {
+    return <ResetPassword onBackToLogin={() => setCurrentPage('login')} />
+  }
+
   if (!session && currentPage === 'landing') {
     return <LandingPage onEnter={() => setCurrentPage('login')} />
   }
@@ -50,7 +56,6 @@ function App() {
         onBack={() => setCurrentPage('landing')}
         onSuccess={() => setCurrentPage('dashboard')}
         signIn={signIn}
-        signUp={signUp}
       />
     )
   }

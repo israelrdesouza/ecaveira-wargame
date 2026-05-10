@@ -1,6 +1,7 @@
-import { ArrowLeft, Loader2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Loader2, LockKeyhole, Mail, ShieldCheck, X } from 'lucide-react'
 import { useState } from 'react'
 import logo from '../assets/ecaveira-logo.png'
+import { sendPasswordResetEmail } from '../services/authService'
 
 function Login({ onBack, onSuccess, signIn }) {
   const [email, setEmail] = useState('')
@@ -8,6 +9,11 @@ function Login({ onBack, onSuccess, signIn }) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isResetOpen, setIsResetOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetMessage, setResetMessage] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetSubmitting, setResetSubmitting] = useState(false)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -28,9 +34,48 @@ function Login({ onBack, onSuccess, signIn }) {
     onSuccess()
   }
 
-  function handleForgotPassword() {
+  function openResetModal() {
+    setResetEmail(email)
+    setResetError('')
+    setResetMessage('')
+    setIsResetOpen(true)
+  }
+
+  function closeResetModal() {
+    if (resetSubmitting) {
+      return
+    }
+
+    setIsResetOpen(false)
+    setResetError('')
+    setResetMessage('')
+  }
+
+  async function handlePasswordReset(event) {
+    event.preventDefault()
     setError('')
-    setMessage('Recuperação de senha será implementada em breve.')
+    setResetError('')
+    setResetMessage('')
+
+    const normalizedEmail = resetEmail.trim()
+
+    if (!normalizedEmail) {
+      setResetError('Informe seu e-mail para receber o link de recuperação.')
+      return
+    }
+
+    setResetSubmitting(true)
+
+    const { error: resetAuthError } = await sendPasswordResetEmail(normalizedEmail)
+
+    setResetSubmitting(false)
+
+    if (resetAuthError) {
+      setResetError(resetAuthError.message)
+      return
+    }
+
+    setResetMessage('Se este e-mail estiver cadastrado, enviaremos um link de recuperação.')
   }
 
   return (
@@ -134,7 +179,7 @@ function Login({ onBack, onSuccess, signIn }) {
 
             <button
               type="button"
-              onClick={handleForgotPassword}
+              onClick={openResetModal}
               className="mx-auto block h-8 w-fit px-2 text-xs font-bold text-zinc-500 transition hover:text-red-300"
             >
               Esqueci minha senha
@@ -142,6 +187,85 @@ function Login({ onBack, onSuccess, signIn }) {
           </form>
         </div>
       </section>
+
+      {isResetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <form
+            onSubmit={handlePasswordReset}
+            className="w-full max-w-md rounded-lg border border-white/10 bg-zinc-950/95 p-5 shadow-2xl shadow-black/60 sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">
+                  Recuperação
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-white">
+                  Esqueci minha senha
+                </h2>
+                <p className="mt-2 text-sm font-medium leading-6 text-zinc-500">
+                  Informe seu e-mail para receber o link seguro de recuperação.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeResetModal}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-500 transition hover:border-red-500/35 hover:text-white"
+                aria-label="Fechar recuperação de senha"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <label className="mt-5 block space-y-2">
+              <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
+                E-mail
+              </span>
+              <span className="flex h-11 items-center gap-2 rounded-md border border-white/10 bg-black/30 px-3 transition focus-within:border-red-500">
+                <Mail size={16} className="shrink-0 text-zinc-500" />
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(event) => setResetEmail(event.target.value)}
+                  autoComplete="email"
+                  placeholder="voce@empresa.com"
+                  className="w-full min-w-0 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
+                />
+              </span>
+            </label>
+
+            {resetError && (
+              <div className="mt-4 rounded-md border border-red-500/25 bg-red-950/25 px-3 py-2 text-sm font-semibold text-red-200">
+                {resetError}
+              </div>
+            )}
+
+            {resetMessage && (
+              <div className="mt-4 flex gap-2 rounded-md border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 text-sm font-semibold text-emerald-200">
+                <ShieldCheck size={17} className="mt-0.5 shrink-0" />
+                <span>{resetMessage}</span>
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeResetModal}
+                className="inline-flex h-10 items-center justify-center rounded-md border border-white/10 px-4 text-sm font-black text-zinc-300 transition hover:border-red-500/30 hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={resetSubmitting}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-black text-white shadow-[0_0_24px_rgba(220,38,38,0.24)] transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {resetSubmitting && <Loader2 size={17} className="animate-spin" />}
+                Enviar link de recuperação
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   )
 }
