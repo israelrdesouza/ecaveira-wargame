@@ -16,14 +16,16 @@ function StatCard({
   }
 
   return (
-    <article className="group rounded-lg border border-white/10 bg-zinc-900/70 p-4 shadow-xl shadow-black/20 backdrop-blur transition hover:-translate-y-0.5 hover:border-red-500/30 hover:bg-zinc-900/90">
+    <article className="group min-w-0 rounded-lg border border-white/10 bg-zinc-900/70 p-4 shadow-xl shadow-black/20 backdrop-blur transition hover:-translate-y-0.5 hover:border-red-500/30 hover:bg-zinc-900/90">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-black uppercase tracking-[0.16em] text-zinc-500">
+          <p className="max-w-full whitespace-normal break-words text-xs font-black uppercase leading-4 tracking-[0.12em] text-zinc-500">
             {label}
           </p>
-          <div className="mt-2 flex items-end gap-2">
-            <p className="text-3xl font-black leading-none text-white">{value}</p>
+          <div className="mt-2 flex min-w-0 flex-wrap items-end gap-x-2 gap-y-1">
+            <p className="max-w-full break-words text-2xl font-black leading-none text-white sm:text-3xl">
+              {value}
+            </p>
             {meta && (
               <p className="pb-0.5 text-xs font-bold uppercase text-zinc-500">{meta}</p>
             )}

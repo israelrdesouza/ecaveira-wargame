@@ -186,7 +186,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 bg-zinc-950/85 px-4 py-5 shadow-2xl shadow-black/50 backdrop-blur-xl lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 overflow-x-hidden border-r border-white/10 bg-zinc-950/85 px-4 py-5 shadow-2xl shadow-black/50 backdrop-blur-xl lg:block">
         <div className="flex h-full flex-col">
         <button
           type="button"
@@ -269,7 +269,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
                 }`}
               >
                 <Icon size={18} strokeWidth={2.4} />
-                <span>{item.label}</span>
+                <span className="min-w-0 truncate">{item.label}</span>
               </button>
             )
           })}

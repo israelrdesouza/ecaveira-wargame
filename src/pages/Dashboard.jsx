@@ -94,13 +94,15 @@ function Dashboard({ onNavigate }) {
   return (
     <section className="space-y-5 sm:space-y-6">
       <header className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-2xl shadow-black/25 backdrop-blur">
-        <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:items-end md:p-6">
-          <div>
+        <div className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:p-6">
+          <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">
               Painel real do cockpit
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              QG COCKPIT — GUERRA COMERCIAL
+            <h1 className="mt-2 max-w-full text-balance text-3xl font-black leading-[0.95] tracking-tight text-white sm:text-4xl xl:text-5xl">
+              <span className="block xl:inline">QG COCKPIT</span>
+              <span className="hidden xl:inline"> — </span>
+              <span className="block xl:inline">GUERRA COMERCIAL</span>
             </h1>
             <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-zinc-400">
               Metas, pipeline, follow-ups e estratégia comercial em tempo real.
@@ -112,9 +114,9 @@ function Dashboard({ onNavigate }) {
             onClick={() => onNavigate('newLead')}
             title="Novo alvo"
             aria-label="Novo alvo"
-            className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-red-400/35 bg-red-600 text-white shadow-lg shadow-red-950/35 transition hover:scale-105 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-300/50 md:h-16 md:w-16"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-red-400/35 bg-red-600 text-white shadow-lg shadow-red-950/35 transition hover:scale-105 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-300/50 sm:h-14 sm:w-14 md:h-16 md:w-16 md:justify-self-end"
           >
-            <Plus size={28} strokeWidth={2.8} />
+            <Plus className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.8} />
           </button>
         </div>
         <div className="grid border-t border-white/10 bg-black/20 sm:grid-cols-3">
@@ -287,11 +289,15 @@ function Dashboard({ onNavigate }) {
 
 function HeaderSignal({ label, value, danger = false }) {
   return (
-    <div className="border-white/10 px-5 py-4 sm:border-r sm:last:border-r-0">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-600">
+    <div className="min-w-0 border-white/10 px-5 py-4 sm:border-r sm:last:border-r-0">
+      <p className="break-words text-xs font-black uppercase leading-4 tracking-[0.14em] text-zinc-600">
         {label}
       </p>
-      <p className={`mt-1 text-xl font-black ${danger ? 'text-red-300' : 'text-white'}`}>
+      <p
+        className={`mt-1 break-words text-lg font-black leading-tight sm:text-xl ${
+          danger ? 'text-red-300' : 'text-white'
+        }`}
+      >
         {value}
       </p>
     </div>
@@ -300,8 +306,8 @@ function HeaderSignal({ label, value, danger = false }) {
 
 function MissionItem({ lead }) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/25 p-3">
-      <p className="text-sm font-black text-white">{lead.empresa}</p>
+    <div className="min-w-0 rounded-md border border-white/10 bg-black/25 p-3">
+      <p className="break-words text-sm font-black text-white">{lead.empresa}</p>
       <p className="mt-1 text-xs font-semibold text-zinc-500">
         {lead.proxima_acao || lead.ultima_acao || 'Contato comercial'}
       </p>
@@ -311,15 +317,15 @@ function MissionItem({ lead }) {
 
 function PriorityTarget({ target }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+    <div className="min-w-0 rounded-lg border border-white/10 bg-black/25 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-base font-black text-white">{target.empresa}</p>
+        <div className="min-w-0">
+          <p className="break-words text-base font-black text-white">{target.empresa}</p>
           <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-red-300">
             {formatStage(target.etapa_atual)}
           </p>
         </div>
-        <p className="rounded-md bg-zinc-800 px-2.5 py-1 text-xs font-black text-zinc-100">
+        <p className="shrink-0 whitespace-nowrap rounded-md bg-zinc-800 px-2.5 py-1 text-xs font-black text-zinc-100">
           {formatCurrencyBRL(target.valor_estimado || 0)}
         </p>
       </div>
