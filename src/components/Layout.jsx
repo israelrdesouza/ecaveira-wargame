@@ -2,7 +2,15 @@ import { LogOut } from 'lucide-react'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
 
-function Layout({ children, currentPage, navItems, onNavigate, onSignOut, user }) {
+function Layout({
+  children,
+  currentPage,
+  navItems,
+  sidebarNavItems = navItems,
+  onNavigate,
+  onSignOut,
+  user,
+}) {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#07080a] text-zinc-100 antialiased">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -13,7 +21,7 @@ function Layout({ children, currentPage, navItems, onNavigate, onSignOut, user }
 
       <Sidebar
         currentPage={currentPage}
-        navItems={navItems}
+        navItems={sidebarNavItems}
         onNavigate={onNavigate}
         onSignOut={onSignOut}
         user={user}

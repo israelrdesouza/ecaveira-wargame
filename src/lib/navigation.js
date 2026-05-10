@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardList, Crosshair, PlusCircle, Target } from 'lucide-react'
+import { BarChart3, ClipboardList, Crosshair, PlusCircle, Target, UsersRound } from 'lucide-react'
 
 export const navItems = [
   {
@@ -27,3 +27,9 @@ export const navItems = [
     icon: ClipboardList,
   },
 ]
+
+export const adminNavItem = {
+  id: 'admin',
+  label: 'Admin',
+  icon: UsersRound,
+}

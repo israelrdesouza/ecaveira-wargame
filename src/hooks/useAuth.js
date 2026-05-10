@@ -1,13 +1,50 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { getProfileById } from '../services/profileService'
 
 export function useAuth() {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let isMounted = true
+
+    async function applySession(nextSession) {
+      if (!isMounted) {
+        return
+      }
+
+      setSession(nextSession)
+      setUser(nextSession?.user ?? null)
+
+      if (!nextSession?.user?.id) {
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+
+      try {
+        const nextProfile = await getProfileById(nextSession.user.id)
+
+        if (!isMounted) {
+          return
+        }
+
+        setProfile(nextProfile)
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setProfile(null)
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
 
     async function loadSession() {
       const { data, error } = await supabase.auth.getSession()
@@ -17,8 +54,8 @@ export function useAuth() {
       }
 
       if (!error) {
-        setSession(data.session)
-        setUser(data.session?.user ?? null)
+        await applySession(data.session)
+        return
       }
 
       setLoading(false)
@@ -33,9 +70,7 @@ export function useAuth() {
         window.sessionStorage.setItem('ecaveira_password_recovery', 'true')
       }
 
-      setSession(nextSession)
-      setUser(nextSession?.user ?? null)
-      setLoading(false)
+      applySession(nextSession)
     })
 
     return () => {
@@ -56,9 +91,15 @@ export function useAuth() {
     return supabase.auth.signOut()
   }
 
+  const isAdmin = profile?.perfil === 'admin'
+  const isBlocked = profile?.ativo === false
+
   return {
     session,
     user,
+    profile,
+    isAdmin,
+    isBlocked,
     loading,
     signIn,
     signUp,
