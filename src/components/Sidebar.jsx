@@ -1,4 +1,4 @@
-import { LogOut, RadioTower, ShieldCheck, Zap } from 'lucide-react'
+import { BadgeDollarSign, LogOut, RadioTower, ShieldCheck, Zap } from 'lucide-react'
 import logo from '../assets/ecaveira-logo.png'
 
 function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
@@ -36,6 +36,25 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Signal label="Foco" value="87%" />
             <Signal label="Ritmo" value="Alto" />
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-red-500/20 bg-red-950/10 p-3 shadow-[0_0_24px_rgba(127,29,29,0.10)]">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-red-500/25 bg-black/25 text-red-300">
+              <BadgeDollarSign size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-red-300/80">
+                META 2026
+              </p>
+              <p className="mt-0.5 text-lg font-black leading-none text-white">
+                R$ 6.083,33
+              </p>
+              <p className="mt-1 text-xs font-semibold text-zinc-500">
+                Até 12/2026
+              </p>
+            </div>
           </div>
         </div>
 

@@ -12,6 +12,21 @@ export function formatCurrencyBRL(value) {
   }).format(numericValue)
 }
 
+export function formatCurrencyBRLWithCents(value) {
+  const numericValue = Number(value)
+
+  if (!Number.isFinite(numericValue)) {
+    return 'R$ 0,00'
+  }
+
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numericValue)
+}
+
 export function formatPhoneBR(value) {
   const digits = String(value ?? '').replace(/\D/g, '')
 
