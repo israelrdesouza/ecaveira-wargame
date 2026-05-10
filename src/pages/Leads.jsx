@@ -1,5 +1,4 @@
 import {
-  Edit3,
   ExternalLink,
   Filter,
   Flame,
@@ -211,7 +210,7 @@ function Leads() {
           isLoading={isLoading}
           movingLeadId={movingLeadId}
           onMoveStage={handleMoveStage}
-          onEdit={(lead) => {
+          onOpenLead={(lead) => {
             setEditingLead(lead)
             setEditError('')
           }}
@@ -236,7 +235,7 @@ function Leads() {
   )
 }
 
-function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onEdit }) {
+function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onOpenLead }) {
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur">
       <div className="hidden grid-cols-[1.2fr_0.85fr_0.7fr_0.8fr_0.65fr_1.35fr] gap-4 border-b border-white/10 bg-black/20 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-zinc-600 lg:grid">
@@ -257,7 +256,18 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onEdit }) {
           leads.map((lead) => (
             <article
               key={lead.id ?? getLeadCompany(lead)}
-              className="grid gap-4 p-4 transition hover:bg-white/[0.025] lg:grid-cols-[1.2fr_0.85fr_0.7fr_0.8fr_0.65fr_1.35fr] lg:items-center"
+              onClick={(event) => {
+                if (isLeadActionTarget(event.target) || !lead.id) return
+
+                if (window.matchMedia('(max-width: 1023px)').matches) {
+                  onOpenLead(lead)
+                }
+              }}
+              onDoubleClick={(event) => {
+                if (isLeadActionTarget(event.target) || !lead.id) return
+                onOpenLead(lead)
+              }}
+              className="grid cursor-pointer gap-4 p-4 transition hover:bg-white/[0.025] lg:grid-cols-[1.2fr_0.85fr_0.7fr_0.8fr_0.65fr_1.35fr] lg:items-center"
             >
               <div className="min-w-0">
                 <h2 className="truncate font-black text-white">
@@ -302,12 +312,6 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onEdit }) {
                   isMoving={movingLeadId === lead.id}
                   onMoveStage={onMoveStage}
                 />
-                <ActionButton
-                  icon={Edit3}
-                  label="Editar"
-                  disabled={!lead.id}
-                  onClick={() => onEdit(lead)}
-                />
                 <ActionButton tone="red" icon={ExternalLink} label="Abrir Ploomes" />
               </div>
             </article>
@@ -319,10 +323,19 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onEdit }) {
 }
 
 function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
-  const [form, setForm] = useState(() => getEditFormFromLead(lead))
+  const [originalForm] = useState(() => getEditFormFromLead(lead))
+  const [form, setForm] = useState(originalForm)
+  const [isEditing, setIsEditing] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
+  const [confirmAction, setConfirmAction] = useState(null)
+  const hasChanges = hasFormChanges(form, originalForm)
+  const isReadOnly = !isEditing || isSaving
 
   function updateField(event) {
+    if (isReadOnly) {
+      return
+    }
+
     const { name, value } = event.target
     const nextValue = normalizeFieldValue(name, value)
 
@@ -340,11 +353,39 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
       return nextForm
     })
 
-    setFieldErrors((current) => ({ ...current, [name]: false }))
+    setFieldErrors((current) => {
+      const nextErrors = { ...current }
+      delete nextErrors[name]
+      return nextErrors
+    })
+  }
+
+  function requestClose() {
+    if (isEditing && hasChanges) {
+      setConfirmAction('discard-close')
+      return
+    }
+
+    onClose()
+  }
+
+  function cancelEdit() {
+    if (hasChanges) {
+      setConfirmAction('discard-edit')
+      return
+    }
+
+    setFieldErrors({})
+    setIsEditing(false)
   }
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    if (!isEditing || isSaving || !hasChanges) {
+      return
+    }
+
     const validationErrors = validateEditForm(form)
 
     if (Object.keys(validationErrors).length > 0) {
@@ -352,6 +393,24 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
       return
     }
 
+    setConfirmAction('save')
+  }
+
+  function confirmDiscard() {
+    setConfirmAction(null)
+    setFieldErrors({})
+
+    if (confirmAction === 'discard-close') {
+      onClose()
+      return
+    }
+
+    setForm(originalForm)
+    setIsEditing(false)
+  }
+
+  function confirmSave() {
+    setConfirmAction(null)
     onSave(form)
   }
 
@@ -361,18 +420,20 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
         <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">
-              Editar lead
+              {isEditing ? 'Editar lead' : 'Detalhes do lead'}
             </p>
             <h2 className="mt-2 text-2xl font-black text-white">
               {getLeadCompany(lead)}
             </h2>
             <p className="mt-1 text-sm font-medium text-zinc-500">
-              Ajuste os dados comerciais mantendo o histórico do lead.
+              {isEditing
+                ? 'Ajuste os dados comerciais mantendo o histórico do lead.'
+                : 'Revise os dados antes de liberar qualquer alteração.'}
             </p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             disabled={isSaving}
             className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/10 text-zinc-400 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Fechar edição"
@@ -391,6 +452,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               placeholder="Digite o nome da empresa e/ou pessoa"
               error={fieldErrors.empresa}
               required
+              disabled={isReadOnly}
             />
             <EditField
               label="Contato"
@@ -400,6 +462,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               placeholder="Digite o nome do contato"
               error={fieldErrors.contato}
               required
+              disabled={isReadOnly}
             />
             <EditField
               label="Celular"
@@ -409,6 +472,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               placeholder="(27) 99999-9999"
               error={fieldErrors.celular}
               required
+              disabled={isReadOnly}
             />
             <EditField
               label="Email"
@@ -417,6 +481,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               value={form.email}
               onChange={updateField}
               placeholder="Opcional"
+              disabled={isReadOnly}
             />
             <EditSelect
               label="Produto"
@@ -426,6 +491,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               options={PRODUCTS}
               error={fieldErrors.produto}
               required
+              disabled={isReadOnly}
             />
             {form.produto === 'Outro' && (
               <EditField
@@ -436,6 +502,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
                 placeholder="Digite o produto"
                 error={fieldErrors.produto_outro}
                 required
+                disabled={isReadOnly}
               />
             )}
             <EditSelect
@@ -446,6 +513,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               options={ORIGINS}
               error={fieldErrors.origem}
               required
+              disabled={isReadOnly}
             />
             {form.origem === 'Outro' && (
               <EditField
@@ -456,6 +524,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
                 placeholder="Digite a origem"
                 error={fieldErrors.origem_outro}
                 required
+                disabled={isReadOnly}
               />
             )}
             <label className="space-y-2">
@@ -467,7 +536,8 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
                 name="temperatura"
                 value={form.temperatura}
                 onChange={updateField}
-                className={getInputClassName(fieldErrors.temperatura)}
+                disabled={isReadOnly}
+                className={getInputClassName(fieldErrors.temperatura, isReadOnly)}
                 required
               >
                 {TEMPERATURES.map((temperature) => (
@@ -481,6 +551,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               type="date"
               value={form.proximo_contato}
               onChange={updateField}
+              disabled={isReadOnly}
             />
             <EditField
               label="Próxima ação"
@@ -488,6 +559,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               value={form.proxima_acao}
               onChange={updateField}
               placeholder="Ex: ligar amanhã, enviar proposta, agendar demo"
+              disabled={isReadOnly}
             />
             <EditField
               label="Link do Ploomes/CRM Vendas"
@@ -496,6 +568,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               onChange={updateField}
               icon={Link}
               placeholder="Cole aqui o link do Ploomes ou CRM Vendas"
+              disabled={isReadOnly}
             />
             <EditField
               label="Valor estimado"
@@ -503,6 +576,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
               value={form.valor_estimado}
               onChange={updateField}
               placeholder="Ex: 549,90"
+              disabled={isReadOnly}
             />
             <label className="space-y-2 md:col-span-2 xl:col-span-3">
               <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
@@ -512,12 +586,55 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
                 name="observacao"
                 value={form.observacao}
                 onChange={updateField}
+                disabled={isReadOnly}
                 rows={4}
-                className="w-full resize-none rounded-md border border-white/10 bg-black/30 px-3 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-600 focus:border-red-500"
+                className={`w-full resize-none rounded-md border border-white/10 bg-black/30 px-3 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-600 focus:border-red-500 disabled:cursor-not-allowed disabled:opacity-70 ${
+                  isReadOnly ? 'text-zinc-300' : ''
+                }`}
                 placeholder="Digite uma observação rápida sobre o lead"
               />
             </label>
           </div>
+
+          {confirmAction && (
+            <div className="mt-5 rounded-lg border border-red-500/25 bg-red-950/20 p-4">
+              <p className="text-sm font-black text-red-100">
+                {confirmAction === 'save'
+                  ? 'Deseja salvar as alterações deste lead?'
+                  : 'Existem alterações não salvas. Deseja sair sem salvar?'}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction(null)}
+                  disabled={isSaving}
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-white/10 px-4 text-sm font-black text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Continuar editando
+                </button>
+                {confirmAction === 'save' ? (
+                  <button
+                    type="button"
+                    onClick={confirmSave}
+                    disabled={isSaving}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isSaving && <Loader2 size={16} className="animate-spin" />}
+                    Salvar alterações
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={confirmDiscard}
+                    disabled={isSaving}
+                    className="inline-flex h-10 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    Sair sem salvar
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mt-5 rounded-md border border-red-500/25 bg-red-950/25 px-3 py-2 text-sm font-semibold text-red-200">
@@ -525,7 +642,7 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
             </div>
           )}
 
-          {Object.keys(fieldErrors).length > 0 && (
+          {Object.values(fieldErrors).some(Boolean) && (
             <div className="mt-5 rounded-md border border-red-500/25 bg-red-950/25 px-3 py-2 text-sm font-semibold text-red-200">
               Preencha os campos obrigatórios antes de salvar.
             </div>
@@ -533,25 +650,57 @@ function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
 
           <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium text-zinc-500">
-              A edição será registrada no histórico do lead.
+              {isEditing
+                ? 'A edição será registrada no histórico do lead.'
+                : 'Duplo clique no desktop ou toque no mobile abre este painel.'}
             </p>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSaving}
-                className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 px-5 text-sm font-black text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-red-600 px-5 text-sm font-black text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {isSaving ? 'Salvando...' : 'Salvar edição'}
-              </button>
+              {isEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    disabled={isSaving}
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 px-5 text-sm font-black text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Cancelar edição
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving || !hasChanges}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-red-600 px-5 text-sm font-black text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isSaving ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Save size={18} />
+                    )}
+                    {isSaving ? 'Salvando...' : 'Salvar alterações'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={requestClose}
+                    disabled={isSaving}
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 px-5 text-sm font-black text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmAction(null)
+                      setIsEditing(true)
+                    }}
+                    disabled={isSaving}
+                    className="inline-flex h-11 items-center justify-center rounded-md bg-red-600 px-5 text-sm font-black text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    Editar
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </form>
@@ -564,7 +713,10 @@ function StageSelect({ lead, isMoving, onMoveStage }) {
   const currentStage = normalizeStageValue(lead.etapa_atual ?? lead.stage)
 
   return (
-    <label className="relative inline-flex h-9 items-center rounded-md border border-white/10 bg-black/20 text-xs font-black text-zinc-300 transition focus-within:border-red-500/40 hover:border-zinc-500/50 hover:text-white">
+    <label
+      data-lead-action
+      className="relative inline-flex h-9 items-center rounded-md border border-white/10 bg-black/20 text-xs font-black text-zinc-300 transition focus-within:border-red-500/40 hover:border-zinc-500/50 hover:text-white"
+    >
       {isMoving && (
         <Loader2 size={14} className="ml-2 shrink-0 animate-spin text-red-300" />
       )}
@@ -637,6 +789,7 @@ function ActionButton({ icon: Icon, label, tone = 'zinc', onClick, disabled = fa
   return (
     <button
       type="button"
+      data-lead-action
       onClick={onClick}
       disabled={disabled}
       className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
@@ -645,6 +798,10 @@ function ActionButton({ icon: Icon, label, tone = 'zinc', onClick, disabled = fa
       {label}
     </button>
   )
+}
+
+function isLeadActionTarget(target) {
+  return Boolean(target?.closest?.('[data-lead-action]'))
 }
 
 function EditField({
@@ -657,6 +814,7 @@ function EditField({
   icon: Icon,
   error = false,
   required = false,
+  disabled = false,
 }) {
   return (
     <label className="space-y-2">
@@ -672,14 +830,24 @@ function EditField({
           onChange={onChange}
           placeholder={placeholder}
           required={required}
-          className="w-full min-w-0 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
+          disabled={disabled}
+          className="w-full min-w-0 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600 disabled:cursor-not-allowed disabled:text-zinc-300"
         />
       </span>
     </label>
   )
 }
 
-function EditSelect({ label, name, value, onChange, options, error = false, required = false }) {
+function EditSelect({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  error = false,
+  required = false,
+  disabled = false,
+}) {
   return (
     <label className="space-y-2">
       <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
@@ -690,7 +858,8 @@ function EditSelect({ label, name, value, onChange, options, error = false, requ
         value={value}
         onChange={onChange}
         required={required}
-        className={getInputClassName(error)}
+        disabled={disabled}
+        className={getInputClassName(error, disabled)}
       >
         {options.map((option) => (
           <option key={option} className="bg-zinc-950">
@@ -767,6 +936,29 @@ function getEditFormFromLead(lead) {
     observacao: lead.observacao ?? '',
     link_ploomes: lead.link_ploomes ?? '',
     valor_estimado: lead.valor_estimado ?? '',
+  }
+}
+
+function hasFormChanges(form, originalForm) {
+  return JSON.stringify(getComparableEditForm(form)) !== JSON.stringify(getComparableEditForm(originalForm))
+}
+
+function getComparableEditForm(form) {
+  return {
+    empresa: String(form.empresa ?? '').trim(),
+    contato: String(form.contato ?? '').trim(),
+    celular: onlyDigits(form.celular),
+    email: String(form.email ?? '').trim(),
+    produto: form.produto,
+    produto_outro: String(form.produto_outro ?? '').trim(),
+    origem: form.origem,
+    origem_outro: String(form.origem_outro ?? '').trim(),
+    temperatura: form.temperatura,
+    proximo_contato: String(form.proximo_contato ?? '').slice(0, 10),
+    proxima_acao: String(form.proxima_acao ?? '').trim(),
+    observacao: String(form.observacao ?? '').trim(),
+    link_ploomes: String(form.link_ploomes ?? '').trim(),
+    valor_estimado: String(form.valor_estimado ?? '').trim(),
   }
 }
 
@@ -848,10 +1040,10 @@ function getFieldWrapperClassName(error) {
   }`
 }
 
-function getInputClassName(error) {
-  return `h-11 w-full rounded-md border bg-black/30 px-3 text-sm font-semibold text-white outline-none transition focus:border-red-500 ${
+function getInputClassName(error, disabled = false) {
+  return `h-11 w-full rounded-md border bg-black/30 px-3 text-sm font-semibold text-white outline-none transition focus:border-red-500 disabled:cursor-not-allowed disabled:opacity-70 ${
     error ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-white/10'
-  }`
+  } ${disabled ? 'text-zinc-300' : ''}`
 }
 
 export default Leads
