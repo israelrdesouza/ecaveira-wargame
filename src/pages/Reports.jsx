@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarDays,
+  FileDown,
   Filter,
   Flame,
   Loader2,
@@ -43,6 +44,7 @@ function Reports() {
   const [leads, setLeads] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [exportMessage, setExportMessage] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -89,13 +91,19 @@ function Reports() {
 
   function applyFilters(event) {
     event.preventDefault()
+    setExportMessage('')
     setAppliedFilters(filters)
   }
 
   function clearFilters() {
     const defaultFilters = getDefaultFilters()
+    setExportMessage('')
     setFilters(defaultFilters)
     setAppliedFilters(defaultFilters)
+  }
+
+  function handleExport() {
+    setExportMessage('Exportação será implementada em breve.')
   }
 
   return (
@@ -115,17 +123,32 @@ function Reports() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-red-500/20 bg-red-950/20 px-4 py-3 text-right">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-red-300">
-              Período
-            </p>
-            <p className="mt-1 text-sm font-black text-white">
-              {formatDateBR(appliedFilters.dataInicial)} até{' '}
-              {formatDateBR(appliedFilters.dataFinal)}
-            </p>
+          <div className="flex flex-col gap-2 sm:flex-row md:flex-col md:items-end">
+            <div className="rounded-lg border border-red-500/20 bg-red-950/20 px-4 py-3 text-left sm:text-right">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-red-300">
+                Período
+              </p>
+              <p className="mt-1 whitespace-nowrap text-sm font-black text-white">
+                {formatReportPeriod(appliedFilters)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 bg-black/20 px-4 text-xs font-black uppercase tracking-[0.12em] text-zinc-300 transition hover:border-red-500/40 hover:text-white"
+            >
+              <FileDown size={16} />
+              Exportar
+            </button>
           </div>
         </div>
       </header>
+
+      {exportMessage && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-950/15 p-4 text-sm font-semibold text-amber-100">
+          {exportMessage}
+        </div>
+      )}
 
       <form
         onSubmit={applyFilters}
@@ -185,7 +208,7 @@ function Reports() {
           />
         </div>
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={clearFilters}
@@ -239,7 +262,11 @@ function Reports() {
         <ReportCard
           label="Leads Caveira"
           value={summary.caveira}
-          detail={formatCurrencyBRL(summary.revenue)}
+          detail={
+            summary.caveiraRevenue > 0
+              ? `Valor em jogo: ${formatCurrencyBRL(summary.caveiraRevenue)}`
+              : 'Leads críticos em acompanhamento'
+          }
           icon={Flame}
           danger
         />
@@ -336,9 +363,9 @@ function ReportTable({ leads, isLoading }) {
         </span>
       </div>
 
-      <div className="hidden min-w-full overflow-x-auto xl:block">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-white/10 text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
+      <div className="hidden overflow-x-auto pb-2 md:block [-webkit-overflow-scrolling:touch]">
+        <table className="min-w-[1180px] text-left text-sm">
+          <thead className="whitespace-nowrap border-b border-white/10 text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
             <tr>
               <th className="px-4 py-3">Empresa</th>
               <th className="px-4 py-3">Contato</th>
@@ -355,32 +382,34 @@ function ReportTable({ leads, isLoading }) {
           <tbody className="divide-y divide-white/10">
             {leads.map((lead) => (
               <tr key={lead.id} className="transition hover:bg-white/[0.025]">
-                <td className="px-4 py-3 font-black text-white">{lead.empresa}</td>
-                <td className="px-4 py-3 font-semibold text-zinc-300">
+                <td className="px-4 py-3 align-middle font-black text-white">
+                  {lead.empresa}
+                </td>
+                <td className="px-4 py-3 align-middle font-semibold text-zinc-300">
                   {lead.contato || 'Não informado'}
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-400">
+                <td className="whitespace-nowrap px-4 py-3 align-middle font-medium text-zinc-400">
                   {formatPhoneBR(lead.celular)}
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-400">
+                <td className="px-4 py-3 align-middle font-medium text-zinc-400">
                   {lead.produto || 'Não informado'}
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-400">
+                <td className="px-4 py-3 align-middle font-medium text-zinc-400">
                   {lead.origem || 'Não informada'}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 align-middle">
                   <StageBadge stage={lead.etapa_atual} />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 align-middle">
                   <TemperatureBadge temperature={lead.temperatura} />
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-400">
+                <td className="whitespace-nowrap px-4 py-3 align-middle font-medium text-zinc-400">
                   {lead.proximo_contato ? formatDateBR(lead.proximo_contato) : 'Sem data'}
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-400">
+                <td className="whitespace-nowrap px-4 py-3 align-middle font-medium text-zinc-400">
                   {formatDateTimeBR(lead.created_at)}
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-400">
+                <td className="min-w-44 px-4 py-3 align-middle font-medium text-zinc-400">
                   {lead.ultima_acao || 'Sem ação registrada'}
                 </td>
               </tr>
@@ -389,14 +418,15 @@ function ReportTable({ leads, isLoading }) {
         </table>
       </div>
 
-      <div className="divide-y divide-white/10 xl:hidden">
+      <div className="divide-y divide-white/10 md:hidden">
         {leads.map((lead) => (
           <div key={lead.id} className="space-y-3 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-black text-white">{lead.empresa}</h3>
                 <p className="mt-1 text-sm font-semibold text-zinc-500">
-                  {lead.contato || 'Sem contato'} · {formatPhoneBR(lead.celular)}
+                  {lead.contato || 'Sem contato'}{' '}
+                  <span className="whitespace-nowrap">· {formatPhoneBR(lead.celular)}</span>
                 </p>
               </div>
               <StageBadge stage={lead.etapa_atual} />
@@ -439,7 +469,7 @@ function ReportTable({ leads, isLoading }) {
 
 function StageBadge({ stage }) {
   return (
-    <span className="inline-flex w-fit rounded-md border border-white/10 bg-black/30 px-2.5 py-1 text-xs font-black text-zinc-200">
+    <span className="inline-flex h-8 w-fit items-center justify-center whitespace-nowrap rounded-md border border-white/10 bg-black/30 px-3 text-xs font-black leading-none text-zinc-200">
       {formatStage(stage)}
     </span>
   )
@@ -451,13 +481,13 @@ function TemperatureBadge({ temperature }) {
 
   return (
     <span
-      className={`inline-flex w-fit items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-black ${
+      className={`inline-flex h-8 w-fit items-center justify-center gap-1 whitespace-nowrap rounded-md border px-3 text-xs font-black leading-none ${
         hot
           ? 'border-red-500/30 bg-red-950/30 text-red-200'
           : 'border-zinc-600/30 bg-zinc-800/50 text-zinc-300'
       }`}
     >
-      <Flame size={13} />
+      <Flame size={13} className="shrink-0" />
       {label}
     </span>
   )
@@ -477,6 +507,7 @@ function Info({ label, value }) {
 function getSummary(leads) {
   const today = getTodayISODate()
   const activeLeads = leads.filter((lead) => !inactiveStages.has(lead.etapa_atual))
+  const caveiraLeads = leads.filter((lead) => lead.temperatura === 'caveira')
 
   return {
     total: leads.length,
@@ -488,13 +519,23 @@ function getSummary(leads) {
     overdueFollowUps: activeLeads.filter(
       (lead) => lead.proximo_contato && lead.proximo_contato < today,
     ).length,
-    caveira: leads.filter((lead) => lead.temperatura === 'caveira').length,
-    revenue: leads.reduce((total, lead) => total + Number(lead.valor_estimado || 0), 0),
+    caveira: caveiraLeads.length,
+    caveiraRevenue: caveiraLeads.reduce(
+      (total, lead) => total + Number(lead.valor_estimado || 0),
+      0,
+    ),
   }
 }
 
 function countByStage(leads, stage) {
   return leads.filter((lead) => lead.etapa_atual === stage).length
+}
+
+function formatReportPeriod(filters) {
+  const initial = filters.dataInicial ? formatDateBR(filters.dataInicial) : 'início'
+  const final = filters.dataFinal ? formatDateBR(filters.dataFinal) : 'hoje'
+
+  return `${initial} até ${final}`
 }
 
 function normalizeFilters(filters) {
