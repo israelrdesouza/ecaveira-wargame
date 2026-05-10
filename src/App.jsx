@@ -6,6 +6,7 @@ import LandingPage from './pages/LandingPage'
 import Leads from './pages/Leads'
 import Login from './pages/Login'
 import NewLead from './pages/NewLead'
+import Reports from './pages/Reports'
 import { useAuth } from './hooks/useAuth'
 import { navItems } from './lib/navigation'
 
@@ -14,6 +15,7 @@ const pages = {
   leads: Leads,
   newLead: NewLead,
   goals: Goals,
+  reports: Reports,
 }
 
 function App() {

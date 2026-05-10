@@ -1,7 +1,7 @@
 function BottomNav({ currentPage, navItems, onNavigate }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/95 px-2 pb-2 pt-2 shadow-2xl shadow-black/70 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+      <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = currentPage === item.id
