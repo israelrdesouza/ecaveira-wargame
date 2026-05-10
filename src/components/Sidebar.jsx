@@ -1,11 +1,10 @@
-import {
+﻿import {
   BadgeDollarSign,
   ChevronLeft,
   ChevronRight,
   Loader2,
   LogOut,
   Pencil,
-  RadioTower,
   Save,
   ShieldCheck,
   Trash2,
@@ -18,7 +17,7 @@ import logo from '../assets/ecaveira-logo.png'
 import { deleteAnnualGoal, getAnnualGoal, upsertAnnualGoal } from '../services/goalService'
 import { formatCurrencyBRLWithCents } from '../utils/formatters'
 
-function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
+function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user, profile }) {
   const currentYear = useMemo(() => new Date().getFullYear(), [])
   const [annualGoal, setAnnualGoal] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -52,6 +51,8 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
   const annualGoalValue = Number(annualGoal?.meta_financeira_padrao || 0)
   const hasAnnualGoal = Number.isFinite(annualGoalValue) && annualGoalValue > 0
   const sidebarNavItems = navItems.filter((item) => item.id !== 'newLead')
+  const operatorName = profile?.nome || user?.email || 'Operador'
+  const operatorRole = formatProfileRole(profile?.perfil)
 
   async function loadModalAnnualGoal(year) {
     if (!user?.id) {
@@ -72,7 +73,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
       setModalGoal(null)
       setForm(getEmptyAnnualGoalForm(year))
       setIsEditing(true)
-      setModalError(error.message || 'Não foi possível carregar a meta anual.')
+      setModalError(error.message || 'NÃ£o foi possÃ­vel carregar a meta anual.')
     } finally {
       setIsLoadingGoal(false)
     }
@@ -144,7 +145,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
 
       notifyAnnualGoalChanged(savedGoal.ano)
     } catch (error) {
-      setModalError(error.message || 'Não foi possível salvar a meta anual.')
+      setModalError(error.message || 'NÃ£o foi possÃ­vel salvar a meta anual.')
     } finally {
       setIsSaving(false)
     }
@@ -170,7 +171,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
       setModalGoal(null)
       setForm(getEmptyAnnualGoalForm(modalYear))
       setIsEditing(true)
-      setModalSuccess('Meta anual excluída.')
+      setModalSuccess('Meta anual excluÃ­da.')
 
       if (Number(modalYear) === currentYear) {
         setAnnualGoal(null)
@@ -178,7 +179,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
 
       notifyAnnualGoalChanged(modalYear)
     } catch (error) {
-      setModalError(error.message || 'Não foi possível excluir a meta anual.')
+      setModalError(error.message || 'NÃ£o foi possÃ­vel excluir a meta anual.')
     } finally {
       setIsSaving(false)
     }
@@ -209,7 +210,18 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
           </span>
         </button>
 
-        <div className="mt-6 rounded-lg border border-white/10 bg-zinc-900/45 p-3">
+        <div className="mt-4 rounded-lg border border-red-500/15 bg-red-950/10 p-3 shadow-[0_0_22px_rgba(127,29,29,0.08)]">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black text-white">
+              {operatorName}
+            </p>
+            <p className="mt-1 text-xs font-bold text-red-200">
+              {operatorRole}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-white/10 bg-zinc-900/45 p-3">
           <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.2em] text-zinc-500">
             <span>Status</span>
             <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_14px_rgba(239,68,68,0.85)]" />
@@ -239,12 +251,12 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
                     {formatCurrencyBRLWithCents(annualGoalValue)}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-zinc-500">
-                    Até {formatAnnualGoalValidity(annualGoal?.vigente_ate)}
+                    AtÃ© {formatAnnualGoalValidity(annualGoal?.vigente_ate)}
                   </p>
                 </>
               ) : (
                 <p className="mt-1 text-xs font-semibold leading-5 text-zinc-500">
-                  Não configurada
+                  NÃ£o configurada
                 </p>
               )}
             </div>
@@ -277,23 +289,6 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
 
         <div className="mt-auto space-y-3">
           <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-4">
-            <p className="truncate text-xs font-black uppercase tracking-[0.16em] text-zinc-600">
-              Operador
-            </p>
-            <p className="mt-1 truncate text-sm font-bold text-zinc-200">
-              {user?.email}
-            </p>
-            <button
-              type="button"
-              onClick={onSignOut}
-              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-red-500/25 bg-red-950/20 text-xs font-black uppercase tracking-[0.12em] text-red-200 transition hover:border-red-400/45 hover:bg-red-950/35 hover:text-white"
-            >
-              <LogOut size={15} />
-              Sair
-            </button>
-          </div>
-
-          <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-md border border-red-500/30 bg-red-950/35 text-red-300">
                 <ShieldCheck size={20} />
@@ -301,16 +296,20 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
               <div>
                 <p className="text-sm font-black text-white">Modo Ataque</p>
                 <p className="mt-0.5 text-xs font-medium text-zinc-500">
-                  Pipeline sob vigilância
+                  Pipeline sob vigilÃ¢ncia
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 px-1 text-xs font-semibold text-zinc-600">
-            <RadioTower size={14} />
-            <span>Operação local, sem backend</span>
-          </div>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-red-500/25 bg-red-950/20 text-xs font-black uppercase tracking-[0.12em] text-red-200 transition hover:border-red-400/45 hover:bg-red-950/35 hover:text-white"
+          >
+            <LogOut size={15} />
+            Sair
+          </button>
         </div>
         </div>
       </aside>
@@ -367,7 +366,7 @@ function AnnualGoalModal({
               Meta anual
             </p>
             <h2 className="mt-2 text-2xl font-black leading-tight text-white">
-              Configuração da Meta Anual
+              ConfiguraÃ§Ã£o da Meta Anual
             </h2>
           </div>
           <button
@@ -398,7 +397,7 @@ function AnnualGoalModal({
             disabled={isLoading || isSaving}
             className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-white/10 px-3 text-xs font-black uppercase tracking-[0.1em] text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Próximo ano
+            PrÃ³ximo ano
             <ChevronRight size={15} />
           </button>
         </div>
@@ -419,7 +418,7 @@ function AnnualGoalModal({
               disabled={!isEditing || isSaving}
             />
             <AnnualGoalField
-              label="Meta financeira padrão"
+              label="Meta financeira padrÃ£o"
               name="meta_financeira_padrao"
               type="text"
               inputMode="decimal"
@@ -429,7 +428,7 @@ function AnnualGoalModal({
               readValue={formatCurrencyBRLWithCents(parseLocalizedNumber(form.meta_financeira_padrao))}
             />
             <AnnualGoalField
-              label="Vigente até"
+              label="Vigente atÃ©"
               name="vigente_ate"
               type="date"
               value={form.vigente_ate}
@@ -438,7 +437,7 @@ function AnnualGoalModal({
             />
             <label className="space-y-2 md:col-span-3">
               <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
-                Observação
+                ObservaÃ§Ã£o
               </span>
               <textarea
                 name="observacao"
@@ -599,15 +598,15 @@ function validateAnnualGoalForm(form) {
   const annualGoalValue = parseLocalizedNumber(form.meta_financeira_padrao)
 
   if (!Number.isInteger(year) || year <= 0) {
-    return 'Informe um ano válido.'
+    return 'Informe um ano vÃ¡lido.'
   }
 
   if (String(form.meta_financeira_padrao ?? '').trim() === '') {
-    return 'Informe a meta financeira padrão.'
+    return 'Informe a meta financeira padrÃ£o.'
   }
 
   if (!Number.isFinite(annualGoalValue) || annualGoalValue < 0) {
-    return 'Informe uma meta financeira padrão maior ou igual a 0.'
+    return 'Informe uma meta financeira padrÃ£o maior ou igual a 0.'
   }
 
   return ''
@@ -662,7 +661,7 @@ function getDateInputValue(value) {
 
 function formatAnnualGoalValidity(value) {
   if (!value) {
-    return 'sem vigência'
+    return 'sem vigÃªncia'
   }
 
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -681,6 +680,15 @@ function formatAnnualGoalValidity(value) {
     year: 'numeric',
     timeZone: 'America/Sao_Paulo',
   }).format(date)
+}
+
+function formatProfileRole(role) {
+  const roles = {
+    admin: 'Admin',
+    operador: 'Operador',
+  }
+
+  return roles[role] ?? 'Operador'
 }
 
 export default Sidebar

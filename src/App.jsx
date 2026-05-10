@@ -103,6 +103,7 @@ function App() {
       onNavigate={setCurrentPage}
       onSignOut={handleSignOut}
       user={user}
+      profile={profile}
     >
       <ActivePage onNavigate={setCurrentPage} />
     </Layout>

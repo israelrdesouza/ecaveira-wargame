@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 
-const PROFILE_FIELDS = 'id,nome,cargo,perfil,ativo,created_at,updated_at'
+const PROFILE_FIELDS = 'id,nome,email,cargo,perfil,ativo,created_at,updated_at'
 
 export async function getProfileById(userId) {
   if (!userId) {
@@ -42,10 +42,23 @@ export async function updateProfileAccess(profileId, updates, currentUserId) {
     throw new Error('Você não pode bloquear seu próprio acesso.')
   }
 
+  if (profileId === currentUserId && updates.perfil && updates.perfil !== 'admin') {
+    throw new Error('Você não pode remover seu próprio perfil de administrador.')
+  }
+
   const payload = {
+    nome: updates.nome,
+    cargo: updates.cargo,
     perfil: updates.perfil,
     ativo: updates.ativo,
+    updated_at: new Date().toISOString(),
   }
+
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === undefined && key !== 'updated_at') {
+      delete payload[key]
+    }
+  })
 
   const { data, error } = await supabase
     .from('profiles')

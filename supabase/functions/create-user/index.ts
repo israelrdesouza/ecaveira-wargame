@@ -10,10 +10,10 @@ const corsHeaders = {
 const allowedProfiles = new Set(['admin', 'operador'])
 
 type CreateUserPayload = {
-  nome: string
-  email: string
+  nome?: string
+  email?: string
   cargo?: string
-  perfil: 'admin' | 'operador'
+  perfil?: 'admin' | 'operador'
   ativo?: boolean
 }
 
@@ -28,10 +28,6 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-
-  // IMPORTANTE:
-  // O Supabase CLI não aceitou secret iniciando com SUPABASE_.
-  // Por isso estamos usando SERVICE_ROLE_KEY.
   const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
 
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
@@ -98,7 +94,7 @@ serve(async (req) => {
     )
   }
 
-  let payload: Partial<CreateUserPayload>
+  let payload: CreateUserPayload
 
   try {
     payload = await req.json()
@@ -106,18 +102,18 @@ serve(async (req) => {
     return jsonResponse({ success: false, message: 'Payload inválido.' }, 400)
   }
 
-  const validationError = validatePayload(payload)
+  const normalizedPayload = {
+    nome: normalizeText(payload.nome),
+    email: normalizeEmail(payload.email),
+    cargo: normalizeText(payload.cargo) || null,
+    perfil: payload.perfil,
+    ativo: payload.ativo !== false,
+  }
+
+  const validationError = validatePayload(normalizedPayload)
 
   if (validationError) {
     return jsonResponse({ success: false, message: validationError }, 400)
-  }
-
-  const normalizedPayload = {
-    nome: payload.nome!.trim(),
-    email: payload.email!.trim().toLowerCase(),
-    cargo: payload.cargo?.trim() || null,
-    perfil: payload.perfil as 'admin' | 'operador',
-    ativo: payload.ativo !== false,
   }
 
   const emailAlreadyExists = await authEmailExists(adminClient, normalizedPayload.email)
@@ -155,6 +151,7 @@ serve(async (req) => {
     {
       id: createdUserData.user.id,
       nome: normalizedPayload.nome,
+      email: normalizedPayload.email,
       cargo: normalizedPayload.cargo,
       perfil: normalizedPayload.perfil,
       ativo: normalizedPayload.ativo,
@@ -181,7 +178,7 @@ serve(async (req) => {
       temporaryPassword,
       user: {
         id: createdUserData.user.id,
-        email: createdUserData.user.email,
+        email: normalizedPayload.email,
         nome: normalizedPayload.nome,
         cargo: normalizedPayload.cargo,
         perfil: normalizedPayload.perfil,
@@ -202,12 +199,16 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   })
 }
 
-function validatePayload(payload: Partial<CreateUserPayload>) {
-  if (!payload?.nome?.trim()) {
+function validatePayload(payload: {
+  nome: string
+  email: string
+  perfil?: 'admin' | 'operador'
+}) {
+  if (!payload.nome) {
     return 'Nome é obrigatório.'
   }
 
-  if (!payload.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+  if (!payload.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
     return 'Informe um e-mail válido.'
   }
 
@@ -225,12 +226,23 @@ async function authEmailExists(adminClient: ReturnType<typeof createClient>, ema
   })
 
   if (error) {
-    // Se não conseguir verificar, deixa a criação tentar.
-    // Se já existir, o próprio Supabase Auth retornará erro.
     return false
   }
 
   return data.users.some((user) => user.email?.toLowerCase() === email)
+}
+
+function normalizeText(value?: string) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase()
+}
+
+function normalizeEmail(value?: string) {
+  return String(value ?? '').trim().toLowerCase()
 }
 
 function generateTemporaryPassword() {
