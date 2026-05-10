@@ -18,6 +18,15 @@ export function updateCurrentUserPassword(password) {
   return supabase.auth.updateUser({ password })
 }
 
+export function updateFirstAccessPassword(password) {
+  return supabase.auth.updateUser({
+    password,
+    data: {
+      primeiro_acesso: false,
+    },
+  })
+}
+
 export function signOutCurrentUser() {
   return supabase.auth.signOut()
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Layout from './components/Layout'
 import Admin from './pages/Admin'
 import Dashboard from './pages/Dashboard'
+import FirstAccessPassword from './pages/FirstAccessPassword'
 import Goals from './pages/Goals'
 import LandingPage from './pages/LandingPage'
 import Leads from './pages/Leads'
@@ -25,9 +26,20 @@ function App() {
   const [currentPage, setCurrentPage] = useState(() =>
     window.location.pathname === '/admin' ? 'admin' : 'landing',
   )
-  const { session, user, profile, isAdmin, isBlocked, loading, signIn, signOut } = useAuth()
+  const {
+    session,
+    user,
+    profile,
+    isAdmin,
+    isBlocked,
+    loading,
+    signIn,
+    signOut,
+    refreshSession,
+  } = useAuth()
   const isResetPasswordRoute = window.location.pathname === '/reset-password'
   const sidebarNavItems = isAdmin ? [...navItems, adminNavItem] : navItems
+  const requiresFirstAccessPassword = user?.user_metadata?.primeiro_acesso === true
   const activePageId =
     session && (currentPage === 'landing' || currentPage === 'login')
       ? 'dashboard'
@@ -37,6 +49,11 @@ function App() {
   async function handleSignOut() {
     await signOut()
     setCurrentPage('login')
+  }
+
+  async function handleFirstAccessComplete() {
+    await refreshSession()
+    setCurrentPage('dashboard')
   }
 
   if (loading) {
@@ -53,6 +70,15 @@ function App() {
 
   if (session && isBlocked) {
     return <BlockedAccess profile={profile} onSignOut={handleSignOut} />
+  }
+
+  if (session && requiresFirstAccessPassword) {
+    return (
+      <FirstAccessPassword
+        onComplete={handleFirstAccessComplete}
+        onSignOut={handleSignOut}
+      />
+    )
   }
 
   if (!session && currentPage === 'landing') {

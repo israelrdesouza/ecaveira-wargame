@@ -91,6 +91,35 @@ export function useAuth() {
     return supabase.auth.signOut()
   }
 
+  async function refreshSession() {
+    setLoading(true)
+
+    const { data, error } = await supabase.auth.getSession()
+
+    if (error) {
+      setLoading(false)
+      return
+    }
+
+    setSession(data.session)
+    setUser(data.session?.user ?? null)
+
+    if (!data.session?.user?.id) {
+      setProfile(null)
+      setLoading(false)
+      return
+    }
+
+    try {
+      const nextProfile = await getProfileById(data.session.user.id)
+      setProfile(nextProfile)
+    } catch {
+      setProfile(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const isAdmin = profile?.perfil === 'admin'
   const isBlocked = profile?.ativo === false
 
@@ -104,5 +133,6 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    refreshSession,
   }
 }
