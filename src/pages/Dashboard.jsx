@@ -9,11 +9,11 @@ import {
   Handshake,
   Loader2,
   PhoneCall,
+  Plus,
   Radar,
   Trophy,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import logo from '../assets/ecaveira-logo.png'
 import StatCard from '../components/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { getDashboardData } from '../services/dashboardService'
@@ -96,40 +96,25 @@ function Dashboard({ onNavigate }) {
       <header className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-2xl shadow-black/25 backdrop-blur">
         <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:items-end md:p-6">
           <div>
-            <div className="group inline-flex max-w-full items-center gap-3 rounded-lg border border-red-500/20 bg-red-950/20 p-2 pr-4 shadow-[0_0_32px_rgba(127,29,29,0.14)]">
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-red-500/25 bg-black/35 sm:h-16 sm:w-16">
-                <span className="absolute inset-1 rounded-md bg-red-600/20 blur-md motion-safe:animate-pulse" />
-                <img
-                  src={logo}
-                  alt="eCaveira WarGame"
-                  className="relative h-12 w-12 object-contain drop-shadow-[0_0_14px_rgba(248,113,113,0.5)] transition duration-300 ease-out group-hover:scale-105 sm:h-14 sm:w-14"
-                />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-black uppercase tracking-[0.24em] text-red-300">
-                  eCaveira WarGame
-                </span>
-                <span className="mt-1 block truncate text-xs font-semibold text-zinc-500">
-                  Painel real do cockpit
-                </span>
-              </span>
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              Painel pessoal de guerra comercial
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">
+              Painel real do cockpit
+            </p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              QG COCKPIT — GUERRA COMERCIAL
             </h1>
             <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-zinc-400">
-              Visão rápida do campo: metas, realizado, follow-ups e oportunidades
-              reais do mês.
+              Metas, pipeline, follow-ups e estratégia comercial em tempo real.
             </p>
           </div>
 
           <button
             type="button"
             onClick={() => onNavigate('newLead')}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-red-600 px-5 text-sm font-black text-white shadow-lg shadow-red-950/35 transition hover:bg-red-500"
+            title="Novo alvo"
+            aria-label="Novo alvo"
+            className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-red-400/35 bg-red-600 text-white shadow-lg shadow-red-950/35 transition hover:scale-105 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-300/50 md:h-16 md:w-16"
           >
-            Novo alvo
-            <ChevronRight size={18} />
+            <Plus size={28} strokeWidth={2.8} />
           </button>
         </div>
         <div className="grid border-t border-white/10 bg-black/20 sm:grid-cols-3">

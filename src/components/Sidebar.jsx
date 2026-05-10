@@ -51,6 +51,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
 
   const annualGoalValue = Number(annualGoal?.meta_financeira_padrao || 0)
   const hasAnnualGoal = Number.isFinite(annualGoalValue) && annualGoalValue > 0
+  const sidebarNavItems = navItems.filter((item) => item.id !== 'newLead')
 
   async function loadModalAnnualGoal(year) {
     if (!user?.id) {
@@ -190,23 +191,21 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
         <button
           type="button"
           onClick={() => onNavigate('dashboard')}
-          className="group flex w-full items-center gap-3 rounded-lg border border-red-500/20 bg-red-950/20 p-3 text-left shadow-[0_0_35px_rgba(127,29,29,0.12)] transition hover:border-red-500/45 hover:bg-red-950/30"
+          className="group flex w-full flex-col items-center rounded-lg px-3 py-4 text-center transition hover:bg-white/[0.035]"
         >
-          <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-red-500/25 bg-black/35 shadow-[0_0_26px_rgba(220,38,38,0.26)]">
-            <span className="absolute inset-1 rounded-md bg-red-600/20 blur-md motion-safe:animate-pulse" />
+          <span className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-red-500/20 bg-black/25 shadow-[0_0_34px_rgba(220,38,38,0.20)]">
+            <span className="absolute inset-2 rounded-lg bg-red-600/15 blur-md motion-safe:animate-pulse" />
             <img
               src={logo}
               alt="eCaveira WarGame"
-              className="relative h-12 w-12 object-contain drop-shadow-[0_0_12px_rgba(248,113,113,0.45)] transition duration-300 ease-out group-hover:scale-105"
+              className="relative h-16 w-16 object-contain drop-shadow-[0_0_14px_rgba(248,113,113,0.45)] transition duration-300 ease-out group-hover:scale-105"
             />
           </span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-black uppercase tracking-wide text-white">
-              eCaveira WarGame
-            </span>
-            <span className="mt-0.5 block truncate text-xs font-semibold text-red-200/80">
-              Cockpit comercial pessoal
-            </span>
+          <span className="mt-3 block max-w-full truncate text-sm font-black uppercase tracking-wide text-white">
+            eCaveira WarGame
+          </span>
+          <span className="mt-1 block max-w-full truncate text-xs font-semibold text-red-200/75">
+            Cockpit comercial pessoal
           </span>
         </button>
 
@@ -254,7 +253,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user }) {
         </button>
 
         <nav className="mt-6 space-y-1.5">
-          {navItems.map((item) => {
+          {sidebarNavItems.map((item) => {
             const Icon = item.icon
             const isActive = currentPage === item.id
 
