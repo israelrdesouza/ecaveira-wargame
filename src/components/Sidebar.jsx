@@ -14,10 +14,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import logo from '../assets/ecaveira-logo.png'
+import {
+  PasswordField,
+  PasswordStrength,
+  getPasswordCriteria,
+  getPasswordStrength,
+  validatePassword,
+} from './PasswordSecurity'
+import { updateCurrentUserAuthData } from '../services/authService'
 import { deleteAnnualGoal, getAnnualGoal, upsertAnnualGoal } from '../services/goalService'
+import { updateOwnProfile } from '../services/profileService'
 import { formatCurrencyBRLWithCents } from '../utils/formatters'
+import { normalizeText } from '../utils/normalizers'
 
-function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user, profile }) {
+function Sidebar({
+  currentPage,
+  navItems,
+  onNavigate,
+  onSignOut,
+  user,
+  profile,
+  onProfileUpdated,
+}) {
   const currentYear = useMemo(() => new Date().getFullYear(), [])
   const [annualGoal, setAnnualGoal] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -29,6 +47,7 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user, profile }
   const [isSaving, setIsSaving] = useState(false)
   const [modalError, setModalError] = useState('')
   const [modalSuccess, setModalSuccess] = useState('')
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   const loadCurrentAnnualGoal = useCallback(async () => {
     if (!user?.id) {
@@ -88,6 +107,14 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user, profile }
     setIsModalOpen(false)
     setModalError('')
     setModalSuccess('')
+  }
+
+  function openProfileModal() {
+    setIsProfileModalOpen(true)
+  }
+
+  function closeProfileModal() {
+    setIsProfileModalOpen(false)
   }
 
   function updateFormField(event) {
@@ -211,13 +238,28 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user, profile }
         </button>
 
         <div className="mt-4 rounded-lg border border-red-500/15 bg-red-950/10 p-3 shadow-[0_0_22px_rgba(127,29,29,0.08)]">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black text-white">
-              {operatorName}
-            </p>
-            <p className="mt-1 text-xs font-bold text-red-200">
-              {operatorRole}
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <button
+              type="button"
+              onClick={openProfileModal}
+              className="min-w-0 flex-1 text-left"
+              title="Meu Perfil"
+            >
+              <p className="truncate text-sm font-black text-white">
+                {operatorName}
+              </p>
+              <p className="mt-1 text-xs font-bold text-red-200">
+                {operatorRole}
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={openProfileModal}
+              title="Editar perfil"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-500 transition hover:border-red-500/35 hover:bg-red-950/20 hover:text-red-200"
+            >
+              <Pencil size={14} />
+            </button>
           </div>
         </div>
 
@@ -334,7 +376,226 @@ function Sidebar({ currentPage, navItems, onNavigate, onSignOut, user, profile }
           />,
           document.body,
         )}
+
+      {isProfileModalOpen &&
+        createPortal(
+          <ProfileModal
+            user={user}
+            profile={profile}
+            onClose={closeProfileModal}
+            onProfileUpdated={onProfileUpdated}
+          />,
+          document.body,
+        )}
     </>
+  )
+}
+
+function ProfileModal({ user, profile, onClose, onProfileUpdated }) {
+  const [form, setForm] = useState(() => ({
+    nome: profile?.nome ?? '',
+    email: profile?.email ?? user?.email ?? '',
+    cargo: profile?.cargo ?? '',
+    perfil: formatProfileRole(profile?.perfil),
+  }))
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const hasPasswordInput = Boolean(password || confirmPassword)
+  const passwordCriteria = getPasswordCriteria(password, confirmPassword)
+  const passwordStrength = getPasswordStrength(password)
+  const isPasswordValid = passwordCriteria.every((criterion) => criterion.valid)
+  const canSubmit = !isSavingProfile && (!hasPasswordInput || isPasswordValid)
+
+  function updateField(event) {
+    const { name, value } = event.target
+    setForm((current) => ({ ...current, [name]: value }))
+    setError('')
+    setSuccess('')
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+
+    const normalizedProfile = {
+      nome: normalizeText(form.nome),
+      cargo: normalizeText(form.cargo),
+    }
+
+    if (!normalizedProfile.nome) {
+      setError('Nome é obrigatório.')
+      return
+    }
+
+    if (hasPasswordInput) {
+      const passwordError = validatePassword(password, confirmPassword)
+
+      if (passwordError) {
+        setError(passwordError)
+        return
+      }
+    }
+
+    setIsSavingProfile(true)
+
+    try {
+      await updateOwnProfile(user.id, {
+        nome: normalizedProfile.nome,
+        cargo: normalizedProfile.cargo || null,
+      })
+
+      const { error: authError } = await updateCurrentUserAuthData({
+        password: hasPasswordInput ? password : undefined,
+        metadata: {
+          nome: normalizedProfile.nome,
+          cargo: normalizedProfile.cargo || null,
+        },
+      })
+
+      if (authError) {
+        throw authError
+      }
+
+      setForm((current) => ({
+        ...current,
+        nome: normalizedProfile.nome,
+        cargo: normalizedProfile.cargo,
+      }))
+      setPassword('')
+      setConfirmPassword('')
+      setSuccess('Perfil atualizado com sucesso.')
+      await onProfileUpdated?.()
+    } catch {
+      setError('Não foi possível atualizar o perfil.')
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden bg-black/75 p-4 backdrop-blur-sm">
+      <form
+        onSubmit={handleSubmit}
+        className="max-h-[92vh] w-full max-w-2xl overflow-x-hidden overflow-y-auto rounded-lg border border-red-500/20 bg-zinc-950 p-5 shadow-2xl shadow-black/60 sm:p-6"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
+              Conta
+            </p>
+            <h2 className="mt-2 text-2xl font-black leading-tight text-white">
+              Meu Perfil
+            </h2>
+            <p className="mt-2 text-sm font-medium leading-6 text-zinc-500">
+              Atualize seus dados e, se quiser, defina uma nova senha.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-400 transition hover:border-red-500/40 hover:text-white"
+            aria-label="Fechar Meu Perfil"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <ProfileField label="Nome" name="nome" value={form.nome} onChange={updateField} />
+          <ProfileField label="Login/e-mail" name="email" value={form.email} readOnly />
+          <ProfileField label="Cargo" name="cargo" value={form.cargo} onChange={updateField} />
+          <ProfileField label="Perfil" name="perfil" value={form.perfil} readOnly />
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <PasswordField
+            label="Nova senha"
+            value={password}
+            onChange={setPassword}
+            showValue={showPassword}
+            onToggleShow={() => setShowPassword((current) => !current)}
+            placeholder="Opcional"
+            toggleLabel={showPassword ? 'Ocultar nova senha' : 'Mostrar nova senha'}
+          />
+
+          <PasswordField
+            label="Confirmar nova senha"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            showValue={showConfirmPassword}
+            onToggleShow={() => setShowConfirmPassword((current) => !current)}
+            placeholder="Repita a nova senha"
+            toggleLabel={
+              showConfirmPassword
+                ? 'Ocultar confirmação de senha'
+                : 'Mostrar confirmação de senha'
+            }
+          />
+        </div>
+
+        {hasPasswordInput && (
+          <div className="mt-4">
+            <PasswordStrength criteria={passwordCriteria} strength={passwordStrength} />
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-5 rounded-md border border-red-500/25 bg-red-950/25 px-3 py-2 text-sm font-semibold text-red-200">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mt-5 rounded-md border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 text-sm font-semibold text-emerald-200">
+            {success}
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSavingProfile}
+            className="inline-flex h-10 items-center justify-center rounded-md border border-white/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Fechar
+          </button>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-xs font-black uppercase tracking-[0.12em] text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none"
+          >
+            {isSavingProfile && <Loader2 size={15} className="animate-spin" />}
+            Salvar perfil
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ProfileField({ label, name, value, onChange, readOnly = false }) {
+  return (
+    <label className="space-y-2">
+      <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
+        {label}
+      </span>
+      <input
+        name={name}
+        type="text"
+        value={value}
+        readOnly={readOnly}
+        onChange={onChange}
+        className="h-11 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm font-semibold text-white outline-none transition read-only:cursor-not-allowed read-only:text-zinc-500 focus:border-red-500"
+      />
+    </label>
   )
 }
 

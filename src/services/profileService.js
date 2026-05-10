@@ -73,3 +73,28 @@ export async function updateProfileAccess(profileId, updates, currentUserId) {
 
   return data
 }
+
+export async function updateOwnProfile(userId, updates) {
+  if (!userId) {
+    throw new Error('Usuário inválido.')
+  }
+
+  const payload = {
+    nome: updates.nome,
+    cargo: updates.cargo,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(payload)
+    .eq('id', userId)
+    .select(PROFILE_FIELDS)
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}

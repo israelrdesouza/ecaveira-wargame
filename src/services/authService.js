@@ -18,6 +18,18 @@ export function updateCurrentUserPassword(password) {
   return supabase.auth.updateUser({ password })
 }
 
+export function updateCurrentUserAuthData({ password, metadata }) {
+  const payload = {
+    data: metadata,
+  }
+
+  if (password) {
+    payload.password = password
+  }
+
+  return supabase.auth.updateUser(payload)
+}
+
 export function updateFirstAccessPassword(password) {
   return supabase.auth.updateUser({
     password,

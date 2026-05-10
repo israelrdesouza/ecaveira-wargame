@@ -11,6 +11,7 @@ function Layout({
   onSignOut,
   user,
   profile,
+  onProfileUpdated,
 }) {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#07080a] text-zinc-100 antialiased">
@@ -27,6 +28,7 @@ function Layout({
         onSignOut={onSignOut}
         user={user}
         profile={profile}
+        onProfileUpdated={onProfileUpdated}
       />
 
       <main className="relative min-h-screen min-w-0 px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:ml-72 lg:px-8 lg:py-8">
