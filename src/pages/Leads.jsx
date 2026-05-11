@@ -322,7 +322,7 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onOpenLead }) 
   )
 }
 
-function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
+export function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
   const [originalForm] = useState(() => getEditFormFromLead(lead))
   const [form, setForm] = useState(originalForm)
   const [isEditing, setIsEditing] = useState(false)

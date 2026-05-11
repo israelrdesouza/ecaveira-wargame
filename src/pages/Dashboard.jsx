@@ -5,8 +5,10 @@ import {
   CheckCircle2,
   ChevronRight,
   Crosshair,
+  Eye,
   Flame,
   Handshake,
+  Info,
   Loader2,
   PhoneCall,
   Plus,
@@ -19,7 +21,9 @@ import { createPortal } from 'react-dom'
 import StatCard from '../components/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { getDashboardData } from '../services/dashboardService'
+import { updateLead } from '../services/leadService'
 import { formatCurrencyBRL, formatDateBR, formatPhoneBR } from '../utils/formatters'
+import { EditLeadModal } from './Leads'
 
 const stageIconMap = {
   suspects: Radar,
@@ -83,6 +87,10 @@ function Dashboard({ onNavigate }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [drilldown, setDrilldown] = useState(null)
+  const [isRiskModalOpen, setIsRiskModalOpen] = useState(false)
+  const [editingLead, setEditingLead] = useState(null)
+  const [savingLeadEdit, setSavingLeadEdit] = useState(false)
+  const [leadEditError, setLeadEditError] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -149,6 +157,54 @@ function Dashboard({ onNavigate }) {
 
   function closeDrilldown() {
     setDrilldown(null)
+  }
+
+  function openRiskModal() {
+    setIsRiskModalOpen(true)
+  }
+
+  function closeRiskModal() {
+    setIsRiskModalOpen(false)
+  }
+
+  function openLeadDetails(lead) {
+    if (!lead?.id) {
+      return
+    }
+
+    setEditingLead(lead)
+    setLeadEditError('')
+    setDrilldown(null)
+    setIsRiskModalOpen(false)
+  }
+
+  async function handleSaveLeadEdit(form) {
+    if (!editingLead || savingLeadEdit) {
+      return
+    }
+
+    setSavingLeadEdit(true)
+    setLeadEditError('')
+
+    try {
+      await updateLead(editingLead, form, editingLead.user_id || user.id)
+      const data = await getDashboardData(user.id, mes, ano)
+
+      setDashboardData(data)
+      setDrilldown((current) =>
+        current?.getLeads
+          ? {
+              ...current,
+              leads: current.getLeads(data.leads ?? []),
+            }
+          : current,
+      )
+      setEditingLead(null)
+    } catch (leadError) {
+      setLeadEditError(leadError.message || 'Não foi possível atualizar o lead.')
+    } finally {
+      setSavingLeadEdit(false)
+    }
   }
 
   const auxiliaryDrilldowns = {
@@ -224,6 +280,8 @@ function Dashboard({ onNavigate }) {
             label="Risco operacional"
             value={`${auxiliary?.operationalRisk ?? 0} pendências`}
             danger={(auxiliary?.operationalRisk ?? 0) > 0}
+            onAction={openRiskModal}
+            actionTitle="Ver pendências"
           />
         </div>
       </header>
@@ -390,19 +448,59 @@ function Dashboard({ onNavigate }) {
 
       {drilldown &&
         createPortal(
-          <DrilldownModal drilldown={drilldown} onClose={closeDrilldown} />,
+          <DrilldownModal
+            drilldown={drilldown}
+            onClose={closeDrilldown}
+            onOpenLead={openLeadDetails}
+          />,
           document.body,
         )}
+      {isRiskModalOpen &&
+        createPortal(
+          <RiskModal
+            leads={lists?.overdueFollowUps ?? []}
+            onClose={closeRiskModal}
+            onOpenLead={openLeadDetails}
+          />,
+          document.body,
+        )}
+      {editingLead && (
+        <EditLeadModal
+          lead={editingLead}
+          error={leadEditError}
+          isSaving={savingLeadEdit}
+          onClose={() => {
+            if (!savingLeadEdit) {
+              setEditingLead(null)
+              setLeadEditError('')
+            }
+          }}
+          onSave={handleSaveLeadEdit}
+        />
+      )}
     </section>
   )
 }
 
-function HeaderSignal({ label, value, danger = false }) {
+function HeaderSignal({ label, value, danger = false, onAction, actionTitle }) {
   return (
     <div className="min-w-0 border-white/10 px-5 py-4 sm:border-r sm:last:border-r-0">
-      <p className="break-words text-xs font-black uppercase leading-4 tracking-[0.14em] text-zinc-600">
-        {label}
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="break-words text-xs font-black uppercase leading-4 tracking-[0.14em] text-zinc-600">
+          {label}
+        </p>
+        {onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            title={actionTitle}
+            aria-label={actionTitle}
+            className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-500/20 bg-red-950/10 text-red-300 transition hover:border-red-400/40 hover:bg-red-950/25 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-300/35"
+          >
+            <Info size={14} />
+          </button>
+        )}
+      </div>
       <p
         className={`mt-1 break-words text-lg font-black leading-tight sm:text-xl ${
           danger ? 'text-red-300' : 'text-white'
@@ -410,6 +508,149 @@ function HeaderSignal({ label, value, danger = false }) {
       >
         {value}
       </p>
+    </div>
+  )
+}
+
+function RiskModal({ leads, onClose, onOpenLead }) {
+  const records = (leads ?? []).map((lead) => ({
+    ...lead,
+    pendingType: 'Follow-up vencido',
+  }))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+      <article className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-lg border border-red-500/20 bg-zinc-950 shadow-2xl shadow-black/60">
+        <header className="flex items-start justify-between gap-4 border-b border-white/10 p-5 sm:p-6">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
+              Pendências
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-white">Risco Operacional</h2>
+            <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-zinc-500">
+              Pendências que exigem atenção no período atual.
+            </p>
+            <p className="mt-3 w-fit rounded-md border border-red-500/20 bg-red-950/20 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-red-200">
+              {records.length} pendência{records.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-400 transition hover:border-red-500/40 hover:text-white"
+            aria-label="Fechar risco operacional"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="max-h-[68vh] overflow-y-auto p-4 sm:p-5">
+          {records.length === 0 ? (
+            <p className="rounded-md border border-white/10 bg-black/25 p-4 text-sm font-semibold text-zinc-400">
+              Sem pendências operacionais no período.
+            </p>
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="min-w-[1160px] w-full text-left">
+                  <thead className="border-b border-white/10 bg-black/25">
+                    <tr className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
+                      <th className="px-3 py-3">Tipo</th>
+                      <th className="px-3 py-3">Empresa/Pessoa</th>
+                      <th className="px-3 py-3">Contato</th>
+                      <th className="px-3 py-3">Celular</th>
+                      <th className="px-3 py-3">Etapa</th>
+                      <th className="px-3 py-3">Temperatura</th>
+                      <th className="px-3 py-3">Próximo contato</th>
+                      <th className="px-3 py-3">Última ação</th>
+                      <th className="px-3 py-3">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {records.map((lead) => (
+                      <RiskTableRow key={lead.id} lead={lead} onOpenLead={onOpenLead} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-3 lg:hidden">
+                {records.map((lead) => (
+                  <RiskLeadCard key={lead.id} lead={lead} onOpenLead={onOpenLead} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </article>
+    </div>
+  )
+}
+
+function RiskTableRow({ lead, onOpenLead }) {
+  return (
+    <tr className="text-sm text-zinc-300 transition hover:bg-white/[0.025]">
+      <td className="px-3 py-3">
+        <SmallBadge>{lead.pendingType}</SmallBadge>
+      </td>
+      <td className="px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
+      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.contato || '-'}</td>
+      <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
+        {formatPhoneBR(lead.celular) || '-'}
+      </td>
+      <td className="px-3 py-3">
+        <SmallBadge>{formatStage(lead.etapa_atual)}</SmallBadge>
+      </td>
+      <td className="px-3 py-3">
+        <SmallBadge>{formatTemperature(lead.temperatura)}</SmallBadge>
+      </td>
+      <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
+        {lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
+      </td>
+      <td className="px-3 py-3 font-semibold text-zinc-400">
+        {lead.ultima_acao || lead.proxima_acao || '-'}
+      </td>
+      <td className="px-3 py-3">
+        <OpenLeadButton onClick={() => onOpenLead(lead)} />
+      </td>
+    </tr>
+  )
+}
+
+function RiskLeadCard({ lead, onOpenLead }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <SmallBadge>{lead.pendingType}</SmallBadge>
+          <p className="mt-3 break-words text-base font-black text-white">
+            {lead.empresa || '-'}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-zinc-400">
+            {lead.contato || 'Sem contato informado'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SmallBadge>{formatStage(lead.etapa_atual)}</SmallBadge>
+          <SmallBadge>{formatTemperature(lead.temperatura)}</SmallBadge>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 text-sm font-semibold text-zinc-400 sm:grid-cols-2">
+        <InfoLine label="Celular" value={formatPhoneBR(lead.celular) || '-'} />
+        <InfoLine
+          label="Próximo contato"
+          value={lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
+        />
+        <InfoLine
+          label="Última ação"
+          value={lead.ultima_acao || lead.proxima_acao || '-'}
+          wide
+        />
+      </div>
+      <div className="mt-4 flex justify-end">
+        <OpenLeadButton onClick={() => onOpenLead(lead)} />
+      </div>
     </div>
   )
 }
@@ -457,7 +698,7 @@ function PriorityTarget({ target }) {
   )
 }
 
-function DrilldownModal({ drilldown, onClose }) {
+function DrilldownModal({ drilldown, onClose, onOpenLead }) {
   const records = drilldown.leads ?? []
 
   return (
@@ -494,7 +735,7 @@ function DrilldownModal({ drilldown, onClose }) {
           ) : (
             <>
               <div className="hidden overflow-x-auto lg:block">
-                <table className="min-w-[1120px] w-full text-left">
+                <table className="min-w-[1220px] w-full text-left">
                   <thead className="border-b border-white/10 bg-black/25">
                     <tr className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
                       <th className="px-3 py-3">Empresa/Pessoa</th>
@@ -506,11 +747,16 @@ function DrilldownModal({ drilldown, onClose }) {
                       <th className="px-3 py-3">Temperatura</th>
                       <th className="px-3 py-3">Próximo contato</th>
                       <th className="px-3 py-3">Última ação</th>
+                      <th className="px-3 py-3">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10">
                     {records.map((lead) => (
-                      <DrilldownTableRow key={lead.id} lead={lead} />
+                      <DrilldownTableRow
+                        key={lead.id}
+                        lead={lead}
+                        onOpenLead={onOpenLead}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -518,7 +764,11 @@ function DrilldownModal({ drilldown, onClose }) {
 
               <div className="grid gap-3 lg:hidden">
                 {records.map((lead) => (
-                  <DrilldownLeadCard key={lead.id} lead={lead} />
+                  <DrilldownLeadCard
+                    key={lead.id}
+                    lead={lead}
+                    onOpenLead={onOpenLead}
+                  />
                 ))}
               </div>
             </>
@@ -529,7 +779,7 @@ function DrilldownModal({ drilldown, onClose }) {
   )
 }
 
-function DrilldownTableRow({ lead }) {
+function DrilldownTableRow({ lead, onOpenLead }) {
   return (
     <tr className="text-sm text-zinc-300 transition hover:bg-white/[0.025]">
       <td className="px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
@@ -551,11 +801,14 @@ function DrilldownTableRow({ lead }) {
       <td className="px-3 py-3 font-semibold text-zinc-400">
         {lead.ultima_acao || lead.proxima_acao || '-'}
       </td>
+      <td className="px-3 py-3">
+        <OpenLeadButton onClick={() => onOpenLead(lead)} />
+      </td>
     </tr>
   )
 }
 
-function DrilldownLeadCard({ lead }) {
+function DrilldownLeadCard({ lead, onOpenLead }) {
   return (
     <div className="rounded-lg border border-white/10 bg-black/25 p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -587,6 +840,9 @@ function DrilldownLeadCard({ lead }) {
           wide
         />
       </div>
+      <div className="mt-4 flex justify-end">
+        <OpenLeadButton onClick={() => onOpenLead(lead)} />
+      </div>
     </div>
   )
 }
@@ -607,6 +863,20 @@ function SmallBadge({ children }) {
     <span className="inline-flex min-h-7 items-center rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1 text-xs font-black text-zinc-200">
       {children || '-'}
     </span>
+  )
+}
+
+function OpenLeadButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Abrir lead"
+      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-red-500/20 bg-red-950/15 px-3 text-xs font-black text-red-200 transition hover:border-red-400/45 hover:bg-red-950/30 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-300/35"
+    >
+      <Eye size={15} />
+      Abrir lead
+    </button>
   )
 }
 
