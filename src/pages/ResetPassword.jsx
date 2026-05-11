@@ -14,7 +14,8 @@ import {
   signOutCurrentUser,
   updateCurrentUserPassword,
 } from '../services/authService'
-import { markInviteAccepted } from '../services/profileService'
+import { createInviteAcceptedNotification } from '../services/notificationService'
+import { getProfileById, markInviteAccepted } from '../services/profileService'
 import { supabase } from '../lib/supabase'
 
 function ResetPassword({ onBackToLogin }) {
@@ -178,7 +179,33 @@ function ResetPassword({ onBackToLogin }) {
 
     try {
       const { data } = await getCurrentAuthSession()
-      await markInviteAccepted(data?.session?.user?.id)
+      const currentUserId = data?.session?.user?.id
+      let currentProfile = null
+
+      try {
+        currentProfile = await getProfileById(currentUserId)
+      } catch {
+        currentProfile = null
+      }
+
+      const shouldNotifyInviteAccepted =
+        currentProfile &&
+        currentProfile.convite_status !== 'aceito' &&
+        !currentProfile.convite_aceito_em
+
+      await markInviteAccepted(currentUserId)
+
+      if (shouldNotifyInviteAccepted) {
+        try {
+          await createInviteAcceptedNotification({
+            userId: currentUserId,
+            name: currentProfile.nome,
+            email: currentProfile.email,
+          })
+        } catch {
+          console.warn('Não foi possível registrar notificação interna.')
+        }
+      }
     } catch {
       // A senha já foi atualizada; falhas de status do convite não devem bloquear o usuário.
     }

@@ -2,6 +2,7 @@
   Activity,
   AlertTriangle,
   BadgeDollarSign,
+  Bell,
   ChevronLeft,
   ChevronRight,
   Crosshair,
@@ -27,8 +28,9 @@ import {
 import { updateCurrentUserAuthData } from '../services/authService'
 import { getDashboardData } from '../services/dashboardService'
 import { deleteAnnualGoal, getAnnualGoal, upsertAnnualGoal } from '../services/goalService'
+import { listUnreadNotifications, markNotificationAsRead } from '../services/notificationService'
 import { updateOwnProfile } from '../services/profileService'
-import { formatCurrencyBRLWithCents } from '../utils/formatters'
+import { formatCurrencyBRLWithCents, formatDateTimeBR } from '../utils/formatters'
 import { normalizeText } from '../utils/normalizers'
 
 function Sidebar({
@@ -56,6 +58,10 @@ function Sidebar({
   const [modalSuccess, setModalSuccess] = useState('')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [activeIndicator, setActiveIndicator] = useState(null)
+  const [notifications, setNotifications] = useState([])
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
+  const [markingNotificationId, setMarkingNotificationId] = useState('')
 
   const loadCurrentAnnualGoal = useCallback(async () => {
     if (!user?.id) {
@@ -115,11 +121,34 @@ function Sidebar({
   const sidebarNavItems = navItems.filter((item) => item.id !== 'newLead')
   const operatorName = profile?.nome || user?.email || 'Operador'
   const operatorRole = formatProfileRole(profile?.perfil)
+  const isAdmin = profile?.perfil === 'admin'
   const tacticalSummary = useMemo(
     () => getTacticalSummary(dashboardSummary, currentPeriod),
     [currentPeriod, dashboardSummary],
   )
   const tacticalIndicators = getTacticalIndicators(tacticalSummary, isLoadingSummary)
+
+  const loadNotifications = useCallback(async () => {
+    if (!isAdmin) {
+      setNotifications([])
+      return
+    }
+
+    setIsLoadingNotifications(true)
+
+    try {
+      const data = await listUnreadNotifications()
+      setNotifications(data)
+    } catch {
+      setNotifications([])
+    } finally {
+      setIsLoadingNotifications(false)
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    loadNotifications()
+  }, [loadNotifications])
 
   async function loadModalAnnualGoal(year) {
     if (!user?.id) {
@@ -163,6 +192,28 @@ function Sidebar({
 
   function closeProfileModal() {
     setIsProfileModalOpen(false)
+  }
+
+  function openNotificationsModal() {
+    setIsNotificationsOpen(true)
+    loadNotifications()
+  }
+
+  async function markAsRead(notificationId) {
+    if (!notificationId || markingNotificationId) {
+      return
+    }
+
+    setMarkingNotificationId(notificationId)
+
+    try {
+      await markNotificationAsRead(notificationId)
+      setNotifications((current) => current.filter((item) => item.id !== notificationId))
+    } catch {
+      await loadNotifications()
+    } finally {
+      setMarkingNotificationId('')
+    }
   }
 
   function updateFormField(event) {
@@ -308,6 +359,21 @@ function Sidebar({
             >
               <Pencil size={14} />
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={openNotificationsModal}
+                title="Notificações"
+                className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-500 transition hover:border-red-500/35 hover:bg-red-950/20 hover:text-red-200"
+              >
+                <Bell size={14} />
+                {notifications.length > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border border-zinc-950 bg-red-600 px-1 text-[10px] font-black leading-none text-white shadow-[0_0_14px_rgba(220,38,38,0.55)]">
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -402,6 +468,22 @@ function Sidebar({
         </div>
       </aside>
 
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={openNotificationsModal}
+          title="Notificações"
+          className="fixed right-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-zinc-950/85 text-zinc-300 shadow-2xl shadow-black/40 backdrop-blur-xl transition hover:border-red-500/35 hover:text-red-200 lg:hidden"
+        >
+          <Bell size={17} />
+          {notifications.length > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-zinc-950 bg-red-600 px-1 text-[10px] font-black leading-none text-white shadow-[0_0_14px_rgba(220,38,38,0.55)]">
+              {notifications.length > 9 ? '9+' : notifications.length}
+            </span>
+          )}
+        </button>
+      )}
+
       {isModalOpen &&
         createPortal(
           <AnnualGoalModal
@@ -434,6 +516,18 @@ function Sidebar({
           document.body,
         )}
 
+      {isNotificationsOpen &&
+        createPortal(
+          <NotificationsModal
+            notifications={notifications}
+            isLoading={isLoadingNotifications}
+            markingId={markingNotificationId}
+            onClose={() => setIsNotificationsOpen(false)}
+            onMarkAsRead={markAsRead}
+          />,
+          document.body,
+        )}
+
       {activeIndicator &&
         createPortal(
           <TacticalIndicatorModal
@@ -447,6 +541,88 @@ function Sidebar({
           document.body,
         )}
     </>
+  )
+}
+
+function NotificationsModal({
+  notifications,
+  isLoading,
+  markingId,
+  onClose,
+  onMarkAsRead,
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden bg-black/75 p-4 backdrop-blur-sm">
+      <article className="max-h-[92vh] w-full max-w-xl overflow-x-hidden overflow-y-auto rounded-lg border border-red-500/20 bg-zinc-950 p-5 shadow-2xl shadow-black/60 sm:p-6">
+        <header className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
+              Central interna
+            </p>
+            <h2 className="mt-2 text-2xl font-black leading-tight text-white">
+              Notificações
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-zinc-500">
+              Eventos importantes do eCaveira WarGame.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-400 transition hover:border-red-500/40 hover:text-white"
+            aria-label="Fechar notificações"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="mt-5 space-y-3">
+          {isLoading && (
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/25 p-4 text-sm font-semibold text-zinc-400">
+              <Loader2 size={17} className="animate-spin text-red-300" />
+              Carregando notificações...
+            </div>
+          )}
+
+          {!isLoading && notifications.length === 0 && (
+            <div className="rounded-lg border border-white/10 bg-black/25 p-4 text-sm font-semibold text-zinc-400">
+              Nenhuma notificação nova.
+            </div>
+          )}
+
+          {!isLoading &&
+            notifications.map((notification) => (
+              <article
+                key={notification.id}
+                className="rounded-lg border border-white/10 bg-zinc-900/55 p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-white">{notification.titulo}</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-zinc-400">
+                      {notification.mensagem}
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-zinc-600">
+                      {formatDateTimeBR(notification.created_at)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onMarkAsRead(notification.id)}
+                    disabled={markingId === notification.id}
+                    className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-red-500/25 bg-red-950/15 px-3 text-xs font-black text-red-100 transition hover:border-red-400/45 hover:bg-red-950/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {markingId === notification.id && (
+                      <Loader2 size={14} className="animate-spin" />
+                    )}
+                    Marcar como lida
+                  </button>
+                </div>
+              </article>
+            ))}
+        </div>
+      </article>
+    </div>
   )
 }
 
