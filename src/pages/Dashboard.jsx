@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import StatCard from '../components/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { getDashboardData } from '../services/dashboardService'
@@ -71,6 +72,26 @@ const stageDrilldownMap = {
 }
 
 const inactiveStages = new Set(['fechado', 'perdido'])
+const dashboardPeriodDateFields = [
+  'data_suspect',
+  'data_prospect',
+  'data_demo',
+  'data_negociacao',
+  'data_fechamento',
+]
+const stageChartColors = {
+  Suspects: '#ef4444',
+  Prospects: '#f97316',
+  Demos: '#f59e0b',
+  Negociações: '#22c55e',
+  Fechamentos: '#14b8a6',
+}
+const temperatureChartColors = {
+  Frio: '#64748b',
+  Morno: '#f59e0b',
+  Quente: '#f97316',
+  Caveira: '#ef4444',
+}
 
 function getCurrentPeriod() {
   const now = new Date()
@@ -134,6 +155,8 @@ function Dashboard({ onNavigate }) {
   const lists = dashboardData?.lists
   const leads = dashboardData?.leads ?? []
   const warRhythm = getWarRhythm(dashboardData?.goal, leads, mes, ano)
+  const stageDonutData = getStageDonutData(stages)
+  const temperatureDonutData = getTemperatureDonutData(leads, mes, ano)
 
   function openDrilldown(config) {
     if (!config) {
@@ -359,6 +382,21 @@ function Dashboard({ onNavigate }) {
       </div>
 
       <WarRhythmCard rhythm={warRhythm} />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DonutChartCard
+          title="Distribuição por etapa"
+          subtitle="Realizado do mês por passagem no funil."
+          data={stageDonutData}
+          colors={stageChartColors}
+        />
+        <DonutChartCard
+          title="Distribuição por temperatura"
+          subtitle="Leads movimentados no período por temperatura."
+          data={temperatureDonutData}
+          colors={temperatureChartColors}
+        />
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <article className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
@@ -776,6 +814,118 @@ function RhythmMetric({ label, value, highlight = false, danger = false, success
   )
 }
 
+function DonutChartCard({ title, subtitle, data, colors }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const hasData = total > 0
+
+  return (
+    <article className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-white">{title}</h2>
+          <p className="mt-1 text-sm font-medium text-zinc-500">{subtitle}</p>
+        </div>
+        <span className="w-fit rounded-md border border-red-500/20 bg-red-950/20 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-red-200">
+          {total} total
+        </span>
+      </div>
+
+      {hasData ? (
+        <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] md:items-center">
+          <div className="relative h-64 min-w-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data}
+                  dataKey="value"
+                  nameKey="label"
+                  innerRadius="62%"
+                  outerRadius="82%"
+                  paddingAngle={3}
+                  stroke="rgba(24,24,27,0.95)"
+                  strokeWidth={4}
+                >
+                  {data.map((item) => (
+                    <Cell
+                      key={item.label}
+                      fill={colors[item.label] ?? '#ef4444'}
+                      className="outline-none transition-opacity hover:opacity-80"
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<DonutTooltip total={total} />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-3xl font-black leading-none text-white">{total}</p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-600">
+                  Leads
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {data.map((item) => (
+              <DonutLegendItem
+                key={item.label}
+                item={item}
+                total={total}
+                color={colors[item.label] ?? '#ef4444'}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-5 rounded-md border border-white/10 bg-black/25 p-4 text-sm font-semibold text-zinc-400">
+          Sem dados para exibir no período.
+        </p>
+      )}
+    </article>
+  )
+}
+
+function DonutLegendItem({ item, total, color }) {
+  const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0
+
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-white/10 bg-black/25 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.25)]"
+          style={{ backgroundColor: color }}
+        />
+        <span className="truncate text-sm font-black text-zinc-200">{item.label}</span>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-black text-white">{item.value}</p>
+        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-zinc-600">
+          {percentage}%
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function DonutTooltip({ active, payload, total }) {
+  if (!active || !payload?.length) {
+    return null
+  }
+
+  const item = payload[0]?.payload
+  const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0
+
+  return (
+    <div className="rounded-md border border-white/10 bg-zinc-950/95 px-3 py-2 text-sm shadow-xl shadow-black/40">
+      <p className="font-black text-white">{item.label}</p>
+      <p className="mt-1 font-semibold text-zinc-400">
+        {item.value} registros · {percentage}%
+      </p>
+    </div>
+  )
+}
+
 function MissionItem({ lead }) {
   return (
     <div className="min-w-0 rounded-md border border-white/10 bg-black/25 p-3">
@@ -1070,6 +1220,36 @@ function getWarRhythm(goal, leads, month, year) {
     status,
     supportText: getRhythmSupportText(saldo),
   }
+}
+
+function getStageDonutData(stages) {
+  return (stages ?? []).map((stage) => ({
+    label: stage.label,
+    value: Number(stage.realizado ?? 0),
+  }))
+}
+
+function getTemperatureDonutData(leads, month, year) {
+  const periodLeads = getLeadsMovedInPeriod(leads, month, year)
+  const temperatures = [
+    { key: 'frio', label: 'Frio' },
+    { key: 'morno', label: 'Morno' },
+    { key: 'quente', label: 'Quente' },
+    { key: 'caveira', label: 'Caveira' },
+  ]
+
+  return temperatures.map((temperature) => ({
+    label: temperature.label,
+    value: periodLeads.filter(
+      (lead) => String(lead.temperatura || '').toLowerCase() === temperature.key,
+    ).length,
+  }))
+}
+
+function getLeadsMovedInPeriod(leads, month, year) {
+  return (leads ?? []).filter((lead) =>
+    dashboardPeriodDateFields.some((field) => isDateInMonth(lead[field], month, year)),
+  )
 }
 
 function getRhythmSupportText(saldo) {
