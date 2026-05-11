@@ -1,5 +1,6 @@
 import {
   Loader2,
+  Mail,
   Pencil,
   Plus,
   RotateCcw,
@@ -14,6 +15,7 @@ import {
   createUser,
   deleteUser,
   listUsers,
+  resendUserInvite,
   resetUserOperationalData,
 } from '../services/adminService'
 import { updateProfileAccess } from '../services/profileService'
@@ -76,6 +78,7 @@ function Admin() {
   const [resetForm, setResetForm] = useState(getInitialResetForm)
   const [resettingData, setResettingData] = useState(false)
   const [resetError, setResetError] = useState('')
+  const [resendingInviteId, setResendingInviteId] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -381,6 +384,26 @@ function Admin() {
     }
   }
 
+  async function handleResendInvite(profile) {
+    if (!profile?.id || !canResendInvite(profile) || resendingInviteId) {
+      return
+    }
+
+    setResendingInviteId(profile.id)
+    setError('')
+    setSuccess('')
+
+    try {
+      await resendUserInvite(profile.id)
+      await refreshProfiles()
+      setSuccess('Convite reenviado com sucesso.')
+    } catch (inviteError) {
+      setError(inviteError.message || 'Não foi possível reenviar o convite.')
+    } finally {
+      setResendingInviteId('')
+    }
+  }
+
   if (!isAdmin) {
     return (
       <section className="space-y-5">
@@ -441,13 +464,14 @@ function Admin() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1120px] w-full text-left">
+            <table className="min-w-[1240px] w-full text-left">
               <thead className="border-b border-white/10 bg-black/20">
                 <tr className="text-xs font-black uppercase tracking-[0.14em] text-zinc-600">
                   <th className="px-4 py-3">Usuário</th>
                   <th className="px-4 py-3">Cargo</th>
                   <th className="px-4 py-3">Perfil</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Convite</th>
                   <th className="px-4 py-3">Criado em</th>
                   <th className="px-4 py-3">Ações</th>
                 </tr>
@@ -458,16 +482,18 @@ function Admin() {
                     key={profile.id}
                     profile={profile}
                     currentUserId={user?.id}
-                    disabled={deletingUser || updatingUser || resettingData}
+                    disabled={deletingUser || updatingUser || resettingData || Boolean(resendingInviteId)}
+                    resendingInvite={resendingInviteId === profile.id}
                     onEdit={openEditModal}
                     onDelete={openDeleteModal}
+                    onResendInvite={handleResendInvite}
                     onReset={openResetModal}
                   />
                 ))}
                 {profiles.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-8 text-center text-sm font-semibold text-zinc-500"
                     >
                       Nenhum usuário encontrado.
@@ -707,9 +733,19 @@ function SelectField({ label, name, value, onChange, children }) {
   )
 }
 
-function UserRow({ profile, currentUserId, disabled, onEdit, onDelete, onReset }) {
+function UserRow({
+  profile,
+  currentUserId,
+  disabled,
+  resendingInvite,
+  onEdit,
+  onDelete,
+  onResendInvite,
+  onReset,
+}) {
   const isCurrentUser = profile.id === currentUserId
   const email = getProfileEmail(profile)
+  const inviteStatus = getInviteStatus(profile)
 
   return (
     <tr className="text-sm text-zinc-300 transition hover:bg-white/[0.025]">
@@ -737,6 +773,9 @@ function UserRow({ profile, currentUserId, disabled, onEdit, onDelete, onReset }
           {profile.ativo ? 'Ativo' : 'Bloqueado'}
         </Badge>
       </td>
+      <td className="px-4 py-4">
+        <Badge tone={inviteStatus.tone}>{inviteStatus.label}</Badge>
+      </td>
       <td className="whitespace-nowrap px-4 py-4 font-semibold text-zinc-500">
         {formatDateTimeBR(profile.created_at)}
       </td>
@@ -751,6 +790,21 @@ function UserRow({ profile, currentUserId, disabled, onEdit, onDelete, onReset }
             <Pencil size={14} />
             Editar
           </button>
+          {canResendInvite(profile) && (
+            <button
+              type="button"
+              onClick={() => onResendInvite(profile)}
+              disabled={disabled}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-amber-500/25 bg-amber-950/10 px-3 text-xs font-black text-amber-100 transition hover:border-amber-400/45 hover:bg-amber-950/25 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {resendingInvite ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Mail size={14} />
+              )}
+              Reenviar convite
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onReset(profile)}
@@ -1014,6 +1068,7 @@ function Badge({ children, tone = 'zinc' }) {
   const tones = {
     red: 'border-red-500/25 bg-red-950/25 text-red-200',
     green: 'border-emerald-500/25 bg-emerald-950/20 text-emerald-200',
+    amber: 'border-amber-500/25 bg-amber-950/20 text-amber-200',
     zinc: 'border-white/10 bg-black/25 text-zinc-300',
   }
 
@@ -1118,6 +1173,38 @@ function formatProfileRole(role) {
   }
 
   return roles[role] ?? 'Operador'
+}
+
+function getInviteStatus(profile) {
+  if (profile.convite_status === 'aceito' || profile.convite_aceito_em) {
+    return { label: 'Aceito', tone: 'green' }
+  }
+
+  if (profile.convite_status === 'pendente') {
+    const sentAt = profile.convite_enviado_em ? new Date(profile.convite_enviado_em) : null
+    const expired =
+      sentAt instanceof Date &&
+      !Number.isNaN(sentAt.getTime()) &&
+      Date.now() - sentAt.getTime() > 24 * 60 * 60 * 1000
+
+    return expired
+      ? { label: 'Expirado', tone: 'red' }
+      : { label: 'Pendente', tone: 'amber' }
+  }
+
+  if (profile.convite_status === 'expirado') {
+    return { label: 'Expirado', tone: 'red' }
+  }
+
+  return { label: 'Sem convite', tone: 'zinc' }
+}
+
+function canResendInvite(profile) {
+  if (profile.convite_status === 'aceito' || profile.convite_aceito_em) {
+    return false
+  }
+
+  return profile.convite_status === 'pendente' || profile.convite_status === 'expirado'
 }
 
 function getCreateUserMessage(message = '') {

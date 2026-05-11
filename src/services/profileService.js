@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 
-const PROFILE_FIELDS = 'id,nome,email,cargo,perfil,ativo,created_at,updated_at'
+const PROFILE_FIELDS =
+  'id,nome,email,cargo,perfil,ativo,convite_status,convite_enviado_em,convite_aceito_em,convite_total_envios,ultimo_login_em,created_at,updated_at'
 
 export async function getProfileById(userId) {
   if (!userId) {
@@ -91,6 +92,31 @@ export async function updateOwnProfile(userId, updates) {
     .eq('id', userId)
     .select(PROFILE_FIELDS)
     .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function markInviteAccepted(userId) {
+  if (!userId) {
+    return null
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      convite_status: 'aceito',
+      convite_aceito_em: now,
+      ultimo_login_em: now,
+      updated_at: now,
+    })
+    .eq('id', userId)
+    .select(PROFILE_FIELDS)
+    .maybeSingle()
 
   if (error) {
     throw error

@@ -14,6 +14,8 @@ import {
   signOutCurrentUser,
   updateCurrentUserPassword,
 } from '../services/authService'
+import { markInviteAccepted } from '../services/profileService'
+import { supabase } from '../lib/supabase'
 
 function ResetPassword({ onBackToLogin }) {
   const [password, setPassword] = useState('')
@@ -32,38 +34,99 @@ function ResetPassword({ onBackToLogin }) {
 
   useEffect(() => {
     let isMounted = true
+    const validationTimers = []
 
-    async function checkRecoverySession() {
+    function acceptSession(session) {
+      if (!isMounted || !session) {
+        return
+      }
+
+      validationTimers.forEach((timer) => window.clearTimeout(timer))
+      setHasRecoverySession(true)
+      setIsCheckingSession(false)
+    }
+
+    function rejectLink() {
+      if (!isMounted) {
+        return
+      }
+
+      setHasRecoverySession(false)
+      setIsCheckingSession(false)
+    }
+
+    function queueSessionCheck(delay, { final = false } = {}) {
+      const timer = window.setTimeout(async () => {
+        const { data, error: sessionError } = await getCurrentAuthSession()
+
+        if (data?.session && !sessionError) {
+          acceptSession(data.session)
+          return
+        }
+
+        if (final) {
+          rejectLink()
+        }
+      }, delay)
+
+      validationTimers.push(timer)
+    }
+
+    function queueSessionValidation() {
+      validationTimers.forEach((timer) => window.clearTimeout(timer))
+      validationTimers.length = 0
+
+      ;[350, 800, 1500, 2600].forEach((delay) => queueSessionCheck(delay))
+      queueSessionCheck(4200, { final: true })
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        session &&
+        [
+          'INITIAL_SESSION',
+          'SIGNED_IN',
+          'PASSWORD_RECOVERY',
+          'TOKEN_REFRESHED',
+          'USER_UPDATED',
+        ].includes(event)
+      ) {
+        acceptSession(session)
+      }
+    })
+
+    async function checkSecureSession() {
       const searchParams = new URLSearchParams(window.location.search)
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
       const recoveryCode = searchParams.get('code')
       const urlError = searchParams.get('error') || searchParams.get('error_code')
-      const authLinkType = hashParams.get('type')
-      const hasRecoveryHint =
-        Boolean(recoveryCode) ||
-        authLinkType === 'recovery' ||
-        authLinkType === 'invite' ||
-        hashParams.has('access_token') ||
-        window.sessionStorage.getItem('ecaveira_password_recovery') === 'true'
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
 
       if (urlError) {
-        if (isMounted) {
-          setHasRecoverySession(false)
-          setIsCheckingSession(false)
-        }
-
+        queueSessionValidation()
         return
       }
 
       if (recoveryCode) {
-        const { error: exchangeError } = await exchangeRecoveryCodeForSession(recoveryCode)
+        const { data, error: exchangeError } = await exchangeRecoveryCodeForSession(recoveryCode)
 
-        if (exchangeError) {
-          if (isMounted) {
-            setHasRecoverySession(false)
-            setIsCheckingSession(false)
-          }
+        if (!exchangeError && data?.session) {
+          acceptSession(data.session)
+          return
+        }
+      }
 
+      if (accessToken && refreshToken) {
+        const { data, error: setSessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+
+        if (!setSessionError && data?.session) {
+          acceptSession(data.session)
           return
         }
       }
@@ -74,14 +137,20 @@ function ResetPassword({ onBackToLogin }) {
         return
       }
 
-      setHasRecoverySession(Boolean(data?.session) && !sessionError && hasRecoveryHint)
-      setIsCheckingSession(false)
+      if (data?.session && !sessionError) {
+        acceptSession(data.session)
+        return
+      }
+
+      queueSessionValidation()
     }
 
-    checkRecoverySession()
+    checkSecureSession()
 
     return () => {
       isMounted = false
+      validationTimers.forEach((timer) => window.clearTimeout(timer))
+      subscription.unsubscribe()
     }
   }, [])
 
@@ -105,6 +174,13 @@ function ResetPassword({ onBackToLogin }) {
       setError(updateError.message || 'Não foi possível atualizar a senha.')
       setIsSubmitting(false)
       return
+    }
+
+    try {
+      const { data } = await getCurrentAuthSession()
+      await markInviteAccepted(data?.session?.user?.id)
+    } catch {
+      // A senha já foi atualizada; falhas de status do convite não devem bloquear o usuário.
     }
 
     setMessage('Senha atualizada com sucesso. Faça login novamente.')

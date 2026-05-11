@@ -103,12 +103,19 @@ serve(async (req) => {
     return jsonResponse({ success: false, message: 'Payload inválido.' }, 400)
   }
 
+  if (typeof payload.ativo !== 'boolean') {
+    return jsonResponse(
+      { success: false, message: 'Status ativo deve ser verdadeiro ou falso.' },
+      400,
+    )
+  }
+
   const normalizedPayload = {
     nome: normalizeText(payload.nome),
     email: normalizeEmail(payload.email),
     cargo: normalizeText(payload.cargo) || null,
     perfil: payload.perfil,
-    ativo: payload.ativo !== false,
+    ativo: payload.ativo,
   }
 
   const validationError = validatePayload(normalizedPayload)
@@ -117,7 +124,9 @@ serve(async (req) => {
     return jsonResponse({ success: false, message: validationError }, 400)
   }
 
-  const emailAlreadyExists = await authEmailExists(adminClient, normalizedPayload.email)
+  const emailAlreadyExists =
+    (await profileEmailExists(adminClient, normalizedPayload.email)) ||
+    (await authEmailExists(adminClient, normalizedPayload.email))
 
   if (emailAlreadyExists) {
     return jsonResponse({ success: false, message: 'E-mail já cadastrado.' }, 409)
@@ -129,7 +138,6 @@ serve(async (req) => {
         nome: normalizedPayload.nome,
         cargo: normalizedPayload.cargo,
         perfil: normalizedPayload.perfil,
-        primeiro_acesso: false,
       },
       redirectTo: inviteRedirectTo,
     })
@@ -144,6 +152,8 @@ serve(async (req) => {
     )
   }
 
+  const now = new Date().toISOString()
+
   const { error: profileError } = await adminClient.from('profiles').upsert(
     {
       id: invitedUserData.user.id,
@@ -152,7 +162,11 @@ serve(async (req) => {
       cargo: normalizedPayload.cargo,
       perfil: normalizedPayload.perfil,
       ativo: normalizedPayload.ativo,
-      updated_at: new Date().toISOString(),
+      convite_status: 'pendente',
+      convite_enviado_em: now,
+      convite_aceito_em: null,
+      convite_total_envios: 1,
+      updated_at: now,
     },
     { onConflict: 'id' },
   )
@@ -199,6 +213,7 @@ function validatePayload(payload: {
   nome: string
   email: string
   perfil?: 'admin' | 'operador'
+  ativo?: boolean
 }) {
   if (!payload.nome) {
     return 'Nome é obrigatório.'
@@ -212,7 +227,25 @@ function validatePayload(payload: {
     return 'Perfil é obrigatório.'
   }
 
+  if (typeof payload.ativo !== 'boolean') {
+    return 'Status ativo deve ser verdadeiro ou falso.'
+  }
+
   return ''
+}
+
+async function profileEmailExists(adminClient: ReturnType<typeof createClient>, email: string) {
+  const { data, error } = await adminClient
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (error) {
+    return false
+  }
+
+  return Boolean(data)
 }
 
 async function authEmailExists(adminClient: ReturnType<typeof createClient>, email: string) {
@@ -228,21 +261,21 @@ async function authEmailExists(adminClient: ReturnType<typeof createClient>, ema
   return data.users.some((user) => user.email?.toLowerCase() === email)
 }
 
-function normalizeText(value?: string) {
+function normalizeText(value?: string | null) {
   return String(value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .trim()
     .replace(/\s+/g, ' ')
+    .trim()
     .toUpperCase()
 }
 
-function normalizeEmail(value?: string) {
+function normalizeEmail(value?: string | null) {
   return String(value ?? '').trim().toLowerCase()
 }
 
-function normalizeInviteUserError(message?: string) {
-  const normalizedMessage = message?.toLowerCase() ?? ''
+function normalizeInviteUserError(message = '') {
+  const normalizedMessage = message.toLowerCase()
 
   if (
     normalizedMessage.includes('already') ||
@@ -252,5 +285,9 @@ function normalizeInviteUserError(message?: string) {
     return 'E-mail já cadastrado.'
   }
 
-  return 'Erro ao enviar convite de usuário.'
+  if (normalizedMessage.includes('rate limit')) {
+    return 'Limite de envio de convites atingido. Aguarde alguns minutos e tente novamente.'
+  }
+
+  return 'Não foi possível enviar o convite.'
 }
