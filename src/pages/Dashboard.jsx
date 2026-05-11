@@ -552,18 +552,22 @@ function RiskModal({ leads, onClose, onOpenLead }) {
           ) : (
             <>
               <div className="hidden overflow-x-auto lg:block">
-                <table className="min-w-[1160px] w-full text-left">
+                <table className="min-w-[1120px] w-full table-fixed text-left">
                   <thead className="border-b border-white/10 bg-black/25">
                     <tr className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
-                      <th className="px-3 py-3">Tipo</th>
-                      <th className="px-3 py-3">Empresa/Pessoa</th>
-                      <th className="px-3 py-3">Contato</th>
-                      <th className="px-3 py-3">Celular</th>
-                      <th className="px-3 py-3">Etapa</th>
-                      <th className="px-3 py-3">Temperatura</th>
-                      <th className="px-3 py-3">Próximo contato</th>
-                      <th className="px-3 py-3">Última ação</th>
-                      <th className="px-3 py-3">Ações</th>
+                      <th className="w-[140px] px-3 py-3">Tipo</th>
+                      <th className="w-[180px] px-3 py-3">Empresa/Pessoa</th>
+                      <th className="w-[140px] px-3 py-3">Contato</th>
+                      <th className="w-[132px] px-3 py-3">Celular</th>
+                      <th className="w-[130px] px-3 py-3">Produto</th>
+                      <th className="w-[130px] px-3 py-3">Origem</th>
+                      <th className="w-[112px] px-3 py-3">Etapa</th>
+                      <th className="w-[118px] px-3 py-3">Temp.</th>
+                      <th className="w-[128px] px-3 py-3">Próx. contato</th>
+                      <th className="w-[170px] px-3 py-3">Última ação</th>
+                      <th className="sticky right-0 z-20 w-[104px] bg-black/95 px-3 py-3 text-right shadow-[-14px_0_24px_rgba(0,0,0,0.45)]">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10">
@@ -593,10 +597,16 @@ function RiskTableRow({ lead, onOpenLead }) {
       <td className="px-3 py-3">
         <SmallBadge>{lead.pendingType}</SmallBadge>
       </td>
-      <td className="px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
-      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.contato || '-'}</td>
+      <td className="break-words px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">{lead.contato || '-'}</td>
       <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
         {formatPhoneBR(lead.celular) || '-'}
+      </td>
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">
+        {lead.produto || '-'}
+      </td>
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">
+        {lead.origem || '-'}
       </td>
       <td className="px-3 py-3">
         <SmallBadge>{formatStage(lead.etapa_atual)}</SmallBadge>
@@ -607,10 +617,10 @@ function RiskTableRow({ lead, onOpenLead }) {
       <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
         {lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
       </td>
-      <td className="px-3 py-3 font-semibold text-zinc-400">
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">
         {lead.ultima_acao || lead.proxima_acao || '-'}
       </td>
-      <td className="px-3 py-3">
+      <td className="sticky right-0 z-10 bg-zinc-950/95 px-3 py-3 text-right shadow-[-14px_0_24px_rgba(0,0,0,0.38)]">
         <OpenLeadButton onClick={() => onOpenLead(lead)} />
       </td>
     </tr>
@@ -638,6 +648,8 @@ function RiskLeadCard({ lead, onOpenLead }) {
 
       <div className="mt-4 grid gap-2 text-sm font-semibold text-zinc-400 sm:grid-cols-2">
         <InfoLine label="Celular" value={formatPhoneBR(lead.celular) || '-'} />
+        <InfoLine label="Produto" value={lead.produto || '-'} />
+        <InfoLine label="Origem" value={lead.origem || '-'} />
         <InfoLine
           label="Próximo contato"
           value={lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
@@ -735,19 +747,21 @@ function DrilldownModal({ drilldown, onClose, onOpenLead }) {
           ) : (
             <>
               <div className="hidden overflow-x-auto lg:block">
-                <table className="min-w-[1220px] w-full text-left">
+                <table className="min-w-[1120px] w-full table-fixed text-left">
                   <thead className="border-b border-white/10 bg-black/25">
                     <tr className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
-                      <th className="px-3 py-3">Empresa/Pessoa</th>
-                      <th className="px-3 py-3">Contato</th>
-                      <th className="px-3 py-3">Celular</th>
-                      <th className="px-3 py-3">Produto</th>
-                      <th className="px-3 py-3">Origem</th>
-                      <th className="px-3 py-3">Etapa</th>
-                      <th className="px-3 py-3">Temperatura</th>
-                      <th className="px-3 py-3">Próximo contato</th>
-                      <th className="px-3 py-3">Última ação</th>
-                      <th className="px-3 py-3">Ações</th>
+                      <th className="w-[190px] px-3 py-3">Empresa/Pessoa</th>
+                      <th className="w-[145px] px-3 py-3">Contato</th>
+                      <th className="w-[132px] px-3 py-3">Celular</th>
+                      <th className="w-[130px] px-3 py-3">Produto</th>
+                      <th className="w-[130px] px-3 py-3">Origem</th>
+                      <th className="w-[112px] px-3 py-3">Etapa</th>
+                      <th className="w-[118px] px-3 py-3">Temp.</th>
+                      <th className="w-[128px] px-3 py-3">Próx. contato</th>
+                      <th className="w-[170px] px-3 py-3">Última ação</th>
+                      <th className="sticky right-0 z-20 w-[104px] bg-black/95 px-3 py-3 text-right shadow-[-14px_0_24px_rgba(0,0,0,0.45)]">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10">
@@ -782,13 +796,13 @@ function DrilldownModal({ drilldown, onClose, onOpenLead }) {
 function DrilldownTableRow({ lead, onOpenLead }) {
   return (
     <tr className="text-sm text-zinc-300 transition hover:bg-white/[0.025]">
-      <td className="px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
-      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.contato || '-'}</td>
+      <td className="break-words px-3 py-3 font-black text-white">{lead.empresa || '-'}</td>
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">{lead.contato || '-'}</td>
       <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
         {formatPhoneBR(lead.celular) || '-'}
       </td>
-      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.produto || '-'}</td>
-      <td className="px-3 py-3 font-semibold text-zinc-400">{lead.origem || '-'}</td>
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">{lead.produto || '-'}</td>
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">{lead.origem || '-'}</td>
       <td className="px-3 py-3">
         <SmallBadge>{formatStage(lead.etapa_atual)}</SmallBadge>
       </td>
@@ -798,10 +812,10 @@ function DrilldownTableRow({ lead, onOpenLead }) {
       <td className="whitespace-nowrap px-3 py-3 font-semibold text-zinc-400">
         {lead.proximo_contato ? formatDateBR(lead.proximo_contato) : '-'}
       </td>
-      <td className="px-3 py-3 font-semibold text-zinc-400">
+      <td className="break-words px-3 py-3 font-semibold text-zinc-400">
         {lead.ultima_acao || lead.proxima_acao || '-'}
       </td>
-      <td className="px-3 py-3">
+      <td className="sticky right-0 z-10 bg-zinc-950/95 px-3 py-3 text-right shadow-[-14px_0_24px_rgba(0,0,0,0.38)]">
         <OpenLeadButton onClick={() => onOpenLead(lead)} />
       </td>
     </tr>
@@ -872,10 +886,11 @@ function OpenLeadButton({ onClick }) {
       type="button"
       onClick={onClick}
       title="Abrir lead"
-      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-red-500/20 bg-red-950/15 px-3 text-xs font-black text-red-200 transition hover:border-red-400/45 hover:bg-red-950/30 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-300/35"
+      aria-label="Abrir lead"
+      className="inline-flex h-8 whitespace-nowrap items-center justify-center gap-1.5 rounded-md border border-red-500/25 bg-red-950/25 px-2.5 text-xs font-black text-red-100 shadow-sm shadow-black/20 transition hover:border-red-400/50 hover:bg-red-700/30 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-300/35"
     >
-      <Eye size={15} />
-      Abrir lead
+      <Eye size={14} />
+      Abrir
     </button>
   )
 }
