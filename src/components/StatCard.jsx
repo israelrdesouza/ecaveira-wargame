@@ -1,3 +1,4 @@
+import AnimatedNumber from './AnimatedNumber'
 import AnimatedProgressBar from './AnimatedProgressBar'
 
 function StatCard({
@@ -12,6 +13,7 @@ function StatCard({
   onDoubleClick,
   iconTitle = 'Ver leads',
   animationKey,
+  animationDelay = 0,
 }) {
   const accentClasses = {
     red: 'border-red-500/30 bg-red-950/30 text-red-300',
@@ -24,6 +26,7 @@ function StatCard({
   return (
     <article
       onDoubleClick={onDoubleClick}
+      style={{ animationDelay: `${animationDelay}ms` }}
       className="animate-dashboard-enter group min-w-0 rounded-lg border border-white/10 bg-zinc-900/70 p-4 shadow-xl shadow-black/20 backdrop-blur transition hover:-translate-y-0.5 hover:border-red-500/30 hover:bg-zinc-900/90"
     >
       <div className="flex items-start justify-between gap-3">
@@ -64,7 +67,13 @@ function StatCard({
         <div className="mt-4">
           <div className="mb-1.5 flex items-center justify-between text-[11px] font-black uppercase tracking-[0.14em] text-zinc-600">
             <span>Progresso</span>
-            <span>{progress}%</span>
+            <span>
+              <AnimatedNumber
+                value={progress}
+                suffix="%"
+                animationKey={animationKey}
+              />
+            </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
             <AnimatedProgressBar

@@ -99,6 +99,7 @@ const temperatureChartColors = {
   Quente: '#f97316',
   Caveira: '#ef4444',
 }
+const DASHBOARD_STAGGER_MS = 90
 
 const monthOptions = [
   { value: 1, label: 'Janeiro' },
@@ -437,7 +438,7 @@ function Dashboard({ onNavigate }) {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stages.map((stage) => (
+        {stages.map((stage, index) => (
           <StatCard
             key={`${stage.key}-${dashboardAnimationKey}`}
             label={stage.label}
@@ -450,7 +451,13 @@ function Dashboard({ onNavigate }) {
                 <span className="text-zinc-500">/ {stage.meta}</span>
               </>
             }
-            meta={`${stage.percentual}%`}
+            meta={
+              <AnimatedNumber
+                value={stage.percentual}
+                suffix="%"
+                animationKey={dashboardAnimationKey}
+              />
+            }
             detail={`${stage.faltante} faltando para a meta`}
             progress={stage.percentual}
             icon={stageIconMap[stage.key]}
@@ -459,6 +466,7 @@ function Dashboard({ onNavigate }) {
             onDoubleClick={() => openStageDrilldown(stage)}
             iconTitle="Ver leads"
             animationKey={dashboardAnimationKey}
+            animationDelay={getDashboardStaggerDelay(index)}
           />
         ))}
         <StatCard
@@ -478,6 +486,7 @@ function Dashboard({ onNavigate }) {
           onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
           iconTitle="Ver leads"
           animationKey={dashboardAnimationKey}
+          animationDelay={getDashboardStaggerDelay(stages.length)}
         />
         <StatCard
           key={`caveira-${dashboardAnimationKey}`}
@@ -496,6 +505,7 @@ function Dashboard({ onNavigate }) {
           onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
           iconTitle="Ver leads"
           animationKey={dashboardAnimationKey}
+          animationDelay={getDashboardStaggerDelay(stages.length + 1)}
         />
         <StatCard
           key={`mission-${dashboardAnimationKey}`}
@@ -514,6 +524,7 @@ function Dashboard({ onNavigate }) {
           onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
           iconTitle="Ver leads"
           animationKey={dashboardAnimationKey}
+          animationDelay={getDashboardStaggerDelay(stages.length + 2)}
         />
       </div>
 
@@ -521,6 +532,7 @@ function Dashboard({ onNavigate }) {
         key={`rhythm-${dashboardAnimationKey}`}
         rhythm={warRhythm}
         animationKey={dashboardAnimationKey}
+        animationDelay={getDashboardStaggerDelay(stages.length + 3)}
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -531,6 +543,7 @@ function Dashboard({ onNavigate }) {
           data={stageDonutData}
           colors={stageChartColors}
           animationKey={dashboardAnimationKey}
+          animationDelay={getDashboardStaggerDelay(stages.length + 4)}
         />
         <DonutChartCard
           key={`temperature-chart-${dashboardAnimationKey}`}
@@ -539,12 +552,14 @@ function Dashboard({ onNavigate }) {
           data={temperatureDonutData}
           colors={temperatureChartColors}
           animationKey={dashboardAnimationKey}
+          animationDelay={getDashboardStaggerDelay(stages.length + 5)}
         />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <article
           key={`pipeline-${dashboardAnimationKey}`}
+          style={{ animationDelay: `${getDashboardStaggerDelay(stages.length + 6)}ms` }}
           className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -586,6 +601,7 @@ function Dashboard({ onNavigate }) {
 
         <article
           key={`today-mission-${dashboardAnimationKey}`}
+          style={{ animationDelay: `${getDashboardStaggerDelay(stages.length + 7)}ms` }}
           className="animate-dashboard-enter rounded-lg border border-red-500/20 bg-red-950/15 p-5 shadow-xl shadow-red-950/10 backdrop-blur"
         >
           <div className="flex items-center gap-3">
@@ -615,6 +631,7 @@ function Dashboard({ onNavigate }) {
 
       <article
         key={`priority-${dashboardAnimationKey}`}
+        style={{ animationDelay: `${getDashboardStaggerDelay(stages.length + 8)}ms` }}
         className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -973,7 +990,7 @@ function RiskLeadCard({ lead, onOpenLead }) {
   )
 }
 
-function WarRhythmCard({ rhythm, animationKey }) {
+function WarRhythmCard({ rhythm, animationKey, animationDelay = 0 }) {
   const statusStyles = {
     atrasado: {
       label: 'Atrasado',
@@ -1001,7 +1018,10 @@ function WarRhythmCard({ rhythm, animationKey }) {
       : 0
 
   return (
-    <article className="animate-dashboard-enter overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur">
+    <article
+      style={{ animationDelay: `${animationDelay}ms` }}
+      className="animate-dashboard-enter overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur"
+    >
       <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:items-center">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
@@ -1031,7 +1051,13 @@ function WarRhythmCard({ rhythm, animationKey }) {
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
               <span>Acumulado</span>
-              <span>{progress}%</span>
+              <span>
+                <AnimatedNumber
+                  value={progress}
+                  suffix="%"
+                  animationKey={animationKey}
+                />
+              </span>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
               <AnimatedProgressBar
@@ -1100,13 +1126,23 @@ function RhythmMetric({
   )
 }
 
-function DonutChartCard({ title, subtitle, data, colors, animationKey }) {
+function DonutChartCard({
+  title,
+  subtitle,
+  data,
+  colors,
+  animationKey,
+  animationDelay = 0,
+}) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const hasData = total > 0
   const prefersReducedMotion = usePrefersReducedMotion()
 
   return (
-    <article className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
+    <article
+      style={{ animationDelay: `${animationDelay}ms` }}
+      className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-lg font-black text-white">{title}</h2>
@@ -1132,7 +1168,7 @@ function DonutChartCard({ title, subtitle, data, colors, animationKey }) {
                   stroke="rgba(24,24,27,0.95)"
                   strokeWidth={4}
                   isAnimationActive={!prefersReducedMotion}
-                  animationDuration={850}
+                  animationDuration={1800}
                   animationEasing="ease-out"
                 >
                   {data.map((item) => (
@@ -1196,7 +1232,11 @@ function DonutLegendItem({ item, total, color, animationKey }) {
           <AnimatedNumber value={item.value} animationKey={animationKey} />
         </p>
         <p className="text-[11px] font-black uppercase tracking-[0.12em] text-zinc-600">
-          {percentage}%
+          <AnimatedNumber
+            value={percentage}
+            suffix="%"
+            animationKey={animationKey}
+          />
         </p>
       </div>
     </div>
@@ -1638,6 +1678,10 @@ function getLocalISODate(date) {
   const day = String(date.getDate()).padStart(2, '0')
 
   return `${year}-${month}-${day}`
+}
+
+function getDashboardStaggerDelay(index) {
+  return index * DASHBOARD_STAGGER_MS
 }
 
 function getTodayISODate() {

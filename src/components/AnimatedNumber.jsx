@@ -34,7 +34,7 @@ function easeOutCubic(progress) {
 
 function AnimatedNumber({
   value,
-  duration = 800,
+  duration = 1800,
   prefix = '',
   suffix = '',
   format,
