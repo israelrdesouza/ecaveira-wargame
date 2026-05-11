@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   BadgeCheck,
   CalendarClock,
@@ -132,6 +133,7 @@ function Dashboard({ onNavigate }) {
   const auxiliary = dashboardData?.auxiliary
   const lists = dashboardData?.lists
   const leads = dashboardData?.leads ?? []
+  const warRhythm = getWarRhythm(dashboardData?.goal, leads, mes, ano)
 
   function openDrilldown(config) {
     if (!config) {
@@ -355,6 +357,8 @@ function Dashboard({ onNavigate }) {
           iconTitle="Ver leads"
         />
       </div>
+
+      <WarRhythmCard rhythm={warRhythm} />
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <article className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
@@ -667,6 +671,111 @@ function RiskLeadCard({ lead, onOpenLead }) {
   )
 }
 
+function WarRhythmCard({ rhythm }) {
+  const statusStyles = {
+    atrasado: {
+      label: 'Atrasado',
+      badge: 'border-red-500/30 bg-red-950/30 text-red-100',
+      icon: 'text-red-300',
+      bar: 'from-red-700 via-red-500 to-red-300',
+    },
+    ritmo: {
+      label: 'No ritmo',
+      badge: 'border-emerald-500/25 bg-emerald-950/20 text-emerald-100',
+      icon: 'text-emerald-300',
+      bar: 'from-zinc-700 via-emerald-700 to-emerald-400',
+    },
+    adiantado: {
+      label: 'Adiantado',
+      badge: 'border-emerald-500/35 bg-emerald-950/25 text-emerald-100',
+      icon: 'text-emerald-300',
+      bar: 'from-emerald-800 via-emerald-600 to-emerald-300',
+    },
+  }
+  const style = statusStyles[rhythm.status] ?? statusStyles.ritmo
+  const progress =
+    rhythm.metaAcumulada > 0
+      ? Math.min(Math.round((rhythm.realizadoAcumulado / rhythm.metaAcumulada) * 100), 100)
+      : 0
+
+  return (
+    <article className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur">
+      <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:items-center">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/30 ${style.icon}`}>
+              <Activity size={22} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
+                Execução diária
+              </p>
+              <h2 className="mt-1 text-xl font-black text-white">
+                Ritmo de Guerra
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-zinc-500">
+                Controle diário da meta de Suspects.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <span className={`rounded-md border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] ${style.badge}`}>
+              {style.label}
+            </span>
+            <p className="text-sm font-semibold text-zinc-400">{rhythm.supportText}</p>
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
+              <span>Acumulado</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
+              <div
+                className={`h-full rounded-full bg-gradient-to-r ${style.bar} shadow-[0_0_18px_rgba(239,68,68,0.22)]`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <RhythmMetric label="Missão de hoje" value={rhythm.missaoHoje} highlight />
+          <RhythmMetric label="Realizado hoje" value={rhythm.realizadoHoje} />
+          <RhythmMetric label="Faltam hoje" value={rhythm.faltamHoje} danger={rhythm.faltamHoje > 0} />
+          <RhythmMetric label="Meta base diária" value={rhythm.metaBaseDiaria} />
+          <RhythmMetric label="Realizado acumulado" value={rhythm.realizadoAcumulado} />
+          <RhythmMetric label="Meta acumulada" value={rhythm.metaAcumulada} />
+          <RhythmMetric label="Saldo do ritmo" value={formatSignedNumber(rhythm.saldo)} danger={rhythm.saldo > 0} success={rhythm.saldo < 0} />
+          <RhythmMetric label="Dias úteis decorridos" value={`${rhythm.diasUteisDecorridos}/${rhythm.diasUteis}`} />
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function RhythmMetric({ label, value, highlight = false, danger = false, success = false }) {
+  const valueClass = danger
+    ? 'text-red-200'
+    : success
+      ? 'text-emerald-200'
+      : highlight
+        ? 'text-white'
+        : 'text-zinc-100'
+
+  return (
+    <div className={`min-w-0 rounded-lg border p-4 ${highlight ? 'border-red-500/25 bg-red-950/20' : 'border-white/10 bg-black/25'}`}>
+      <p className="text-xs font-black uppercase leading-4 tracking-[0.12em] text-zinc-600">
+        {label}
+      </p>
+      <p className={`mt-2 break-words text-2xl font-black leading-none ${valueClass}`}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
 function MissionItem({ lead }) {
   return (
     <div className="min-w-0 rounded-md border border-white/10 bg-black/25 p-3">
@@ -918,6 +1027,150 @@ function formatTemperature(temperature) {
   }
 
   return labels[temperature] ?? temperature
+}
+
+function getWarRhythm(goal, leads, month, year) {
+  const metaSuspect = Math.max(Number(goal?.meta_suspect ?? 0), 0)
+  const diasUteis = Math.max(
+    Number(goal?.dias_uteis ?? countWeekdaysInMonth(year, month)),
+    0,
+  )
+  const metaBaseDiaria = diasUteis > 0 ? Math.ceil(metaSuspect / diasUteis) : 0
+  const referenceDate = getBusinessReferenceDate(year, month)
+  const referenceISODate = referenceDate ? getLocalISODate(referenceDate) : ''
+  const diasUteisDecorridos = referenceDate
+    ? countWeekdaysUntil(year, month, referenceDate.getDate())
+    : 0
+  const metaAcumulada = metaBaseDiaria * diasUteisDecorridos
+  const suspectLeads = (leads ?? []).filter((lead) =>
+    isDateInMonth(getSuspectDate(lead), month, year),
+  )
+  const realizadoAcumulado = suspectLeads.filter(
+    (lead) => getSuspectDate(lead) <= referenceISODate,
+  ).length
+  const realizadoHoje = suspectLeads.filter(
+    (lead) => getSuspectDate(lead) === referenceISODate,
+  ).length
+  const saldo = metaAcumulada - realizadoAcumulado
+  const missaoHoje = saldo > 0 ? metaBaseDiaria + saldo : metaBaseDiaria
+  const faltamHoje = Math.max(missaoHoje - realizadoHoje, 0)
+  const status = saldo > 0 ? 'atrasado' : saldo < 0 ? 'adiantado' : 'ritmo'
+
+  return {
+    metaSuspect,
+    diasUteis,
+    diasUteisDecorridos,
+    metaBaseDiaria,
+    metaAcumulada,
+    realizadoAcumulado,
+    realizadoHoje,
+    saldo,
+    missaoHoje,
+    faltamHoje,
+    status,
+    supportText: getRhythmSupportText(saldo),
+  }
+}
+
+function getRhythmSupportText(saldo) {
+  if (saldo > 0) {
+    return `Você está ${saldo} suspects atrás do ritmo.`
+  }
+
+  if (saldo < 0) {
+    return `Você está ${Math.abs(saldo)} suspects adiantado.`
+  }
+
+  return 'Você está no ritmo da meta.'
+}
+
+function getSuspectDate(lead) {
+  return String(lead?.data_suspect || lead?.created_at || '').slice(0, 10)
+}
+
+function getBusinessReferenceDate(year, month) {
+  const today = new Date()
+  const numericYear = Number(year)
+  const numericMonth = Number(month)
+  const currentYear = today.getFullYear()
+  const currentMonth = today.getMonth() + 1
+
+  if (numericYear > currentYear || (numericYear === currentYear && numericMonth > currentMonth)) {
+    return null
+  }
+
+  const lastDay = new Date(numericYear, numericMonth, 0).getDate()
+  const referenceDay =
+    numericYear === currentYear && numericMonth === currentMonth
+      ? Math.min(today.getDate(), lastDay)
+      : lastDay
+  let referenceDate = new Date(numericYear, numericMonth - 1, referenceDay)
+
+  while (referenceDate.getMonth() === numericMonth - 1 && !isWeekday(referenceDate)) {
+    referenceDate = new Date(
+      referenceDate.getFullYear(),
+      referenceDate.getMonth(),
+      referenceDate.getDate() - 1,
+    )
+  }
+
+  return referenceDate.getMonth() === numericMonth - 1 ? referenceDate : null
+}
+
+function countWeekdaysUntil(year, month, dayLimit) {
+  const numericYear = Number(year)
+  const numericMonth = Number(month)
+  const lastDay = new Date(numericYear, numericMonth, 0).getDate()
+  const safeLimit = Math.min(Math.max(Number(dayLimit), 0), lastDay)
+  let days = 0
+
+  for (let day = 1; day <= safeLimit; day += 1) {
+    if (isWeekday(new Date(numericYear, numericMonth - 1, day))) {
+      days += 1
+    }
+  }
+
+  return days
+}
+
+function countWeekdaysInMonth(year, month) {
+  const numericYear = Number(year)
+  const numericMonth = Number(month)
+  const lastDay = new Date(numericYear, numericMonth, 0).getDate()
+
+  return countWeekdaysUntil(numericYear, numericMonth, lastDay)
+}
+
+function isWeekday(date) {
+  const weekday = date.getDay()
+
+  return weekday !== 0 && weekday !== 6
+}
+
+function isDateInMonth(value, month, year) {
+  if (!value) {
+    return false
+  }
+
+  const [dateYear, dateMonth] = String(value).slice(0, 10).split('-').map(Number)
+
+  return dateYear === Number(year) && dateMonth === Number(month)
+}
+
+function getLocalISODate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function formatSignedNumber(value) {
+  if (value > 0) {
+    return `+${value}`
+  }
+
+  return String(value)
 }
 
 function getTodayISODate() {
