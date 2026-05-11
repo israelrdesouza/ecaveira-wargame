@@ -302,6 +302,10 @@ function Leads() {
           isLoading={isLoading}
           movingLeadId={movingLeadId}
           onMoveStage={handleMoveStage}
+          onActionNotice={(message) => {
+            setFeedback(message)
+            setError('')
+          }}
           onOpenLead={(lead) => {
             setEditingLead(lead)
             setEditError('')
@@ -327,7 +331,14 @@ function Leads() {
   )
 }
 
-function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onOpenLead }) {
+function LeadTable({
+  leads,
+  isLoading,
+  movingLeadId,
+  onMoveStage,
+  onOpenLead,
+  onActionNotice,
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur">
       <div className="hidden grid-cols-[1.2fr_0.85fr_0.7fr_0.8fr_0.65fr_1.35fr] gap-4 border-b border-white/10 bg-black/20 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-zinc-600 lg:grid">
@@ -397,14 +408,31 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onOpenLead }) 
                 {formatCurrencyBRL(lead.valor_estimado ?? lead.value)}
               </p>
 
-              <div className="flex flex-wrap gap-2">
-                <ActionButton tone="green" icon={MessageCircle} label="WhatsApp" />
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
                 <StageSelect
                   lead={lead}
                   isMoving={movingLeadId === lead.id}
                   onMoveStage={onMoveStage}
                 />
-                <ActionButton tone="red" icon={ExternalLink} label="Abrir Ploomes" />
+                <ActionButton
+                  tone="green"
+                  icon={MessageCircle}
+                  label="WhatsApp"
+                  disabled={!getLeadPhoneDigits(lead)}
+                  title={
+                    getLeadPhoneDigits(lead)
+                      ? 'Abrir WhatsApp'
+                      : 'Celular não informado'
+                  }
+                  onClick={() => openWhatsApp(lead, onActionNotice)}
+                />
+                <ActionButton
+                  tone="red"
+                  icon={ExternalLink}
+                  label="Abrir Ploomes"
+                  title="Abrir Ploomes"
+                  onClick={() => openPloomes(lead, onActionNotice)}
+                />
               </div>
             </article>
           ))
@@ -412,6 +440,55 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onOpenLead }) 
       </div>
     </div>
   )
+}
+
+function openWhatsApp(lead, onActionNotice) {
+  const phoneDigits = getLeadPhoneDigits(lead)
+
+  if (!phoneDigits) {
+    onActionNotice?.('Celular não informado para este lead.')
+    return
+  }
+
+  const whatsappPhone = phoneDigits.startsWith('55') ? phoneDigits : `55${phoneDigits}`
+  window.open(
+    `https://web.whatsapp.com/send?phone=${whatsappPhone}`,
+    '_blank',
+    'noopener,noreferrer',
+  )
+}
+
+function openPloomes(lead, onActionNotice) {
+  const link = getLeadPloomesLink(lead)
+
+  if (!link) {
+    onActionNotice?.('Link do Ploomes não informado.')
+    return
+  }
+
+  window.open(getExternalUrl(link), '_blank', 'noopener,noreferrer')
+}
+
+function getLeadPhoneDigits(lead) {
+  return onlyDigits(lead?.celular ?? lead?.phone)
+}
+
+function getLeadPloomesLink(lead) {
+  return String(
+    lead?.link_ploomes ??
+      lead?.ploomes ??
+      lead?.ploomes_link ??
+      lead?.crm_link ??
+      '',
+  ).trim()
+}
+
+function getExternalUrl(value) {
+  if (/^https?:\/\//i.test(value)) {
+    return value
+  }
+
+  return `https://${value}`
 }
 
 function getFilteredAndSortedLeads(leads, filters) {
@@ -929,7 +1006,7 @@ function StageSelect({ lead, isMoving, onMoveStage }) {
   return (
     <label
       data-lead-action
-      className="relative inline-flex h-9 items-center rounded-md border border-white/10 bg-black/20 text-xs font-black text-zinc-300 transition focus-within:border-red-500/40 hover:border-zinc-500/50 hover:text-white"
+      className="relative inline-flex h-10 w-full min-w-[138px] items-center rounded-md border border-white/10 bg-black/20 text-xs font-black text-zinc-300 transition focus-within:border-red-500/40 hover:border-zinc-500/50 hover:text-white sm:w-auto"
     >
       {isMoving && (
         <Loader2 size={14} className="ml-2 shrink-0 animate-spin text-red-300" />
@@ -938,7 +1015,7 @@ function StageSelect({ lead, isMoving, onMoveStage }) {
         value={currentStage}
         disabled={isMoving || !lead.id}
         onChange={(event) => onMoveStage(lead, event.target.value)}
-        className="h-full rounded-md bg-transparent px-3 text-xs font-black text-zinc-200 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-full w-full rounded-md bg-transparent px-3 text-xs font-black text-zinc-200 outline-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         {FUNNEL_STAGES.map((stage) => (
           <option key={stage.value} value={stage.value} className="bg-zinc-950">
@@ -996,7 +1073,14 @@ function Temperature({ value }) {
   )
 }
 
-function ActionButton({ icon: Icon, label, tone = 'zinc', onClick, disabled = false }) {
+function ActionButton({
+  icon: Icon,
+  label,
+  tone = 'zinc',
+  onClick,
+  disabled = false,
+  title,
+}) {
   const tones = {
     zinc: 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500/50 hover:text-white',
     red: 'border-red-500/25 bg-red-950/20 text-red-200 hover:border-red-400/45',
@@ -1010,7 +1094,8 @@ function ActionButton({ icon: Icon, label, tone = 'zinc', onClick, disabled = fa
       data-lead-action
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
+      title={title}
+      className={`inline-flex h-10 w-full min-w-[138px] items-center justify-center gap-2 rounded-md border px-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto ${tones[tone]}`}
     >
       <Icon size={15} />
       {label}
