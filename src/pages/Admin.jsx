@@ -3,6 +3,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  RotateCcw,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -10,7 +11,12 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { createUser, deleteUser, listUsers } from '../services/adminService'
+import {
+  createUser,
+  deleteUser,
+  listUsers,
+  resetUserOperationalData,
+} from '../services/adminService'
 import { updateProfileAccess } from '../services/profileService'
 import { useAuth } from '../hooks/useAuth'
 import { formatDateTimeBR } from '../utils/formatters'
@@ -22,6 +28,30 @@ const initialNewUserForm = {
   cargo: '',
   perfil: 'operador',
   ativo: true,
+}
+
+const monthOptions = [
+  { value: 1, label: 'Janeiro' },
+  { value: 2, label: 'Fevereiro' },
+  { value: 3, label: 'Março' },
+  { value: 4, label: 'Abril' },
+  { value: 5, label: 'Maio' },
+  { value: 6, label: 'Junho' },
+  { value: 7, label: 'Julho' },
+  { value: 8, label: 'Agosto' },
+  { value: 9, label: 'Setembro' },
+  { value: 10, label: 'Outubro' },
+  { value: 11, label: 'Novembro' },
+  { value: 12, label: 'Dezembro' },
+]
+
+function getInitialResetForm() {
+  return {
+    mode: 'year',
+    year: String(new Date().getFullYear()),
+    months: [],
+    confirmation: '',
+  }
 }
 
 function Admin() {
@@ -44,6 +74,10 @@ function Admin() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deletingUser, setDeletingUser] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [resetTarget, setResetTarget] = useState(null)
+  const [resetForm, setResetForm] = useState(getInitialResetForm)
+  const [resettingData, setResettingData] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -284,6 +318,84 @@ function Admin() {
     }
   }
 
+  function openResetModal(profile) {
+    setResetTarget(profile)
+    setResetForm(getInitialResetForm())
+    setResetError('')
+  }
+
+  function closeResetModal() {
+    if (resettingData) {
+      return
+    }
+
+    setResetTarget(null)
+    setResetForm(getInitialResetForm())
+    setResetError('')
+  }
+
+  function updateResetField(event) {
+    const { name, value } = event.target
+
+    setResetForm((current) => ({
+      ...current,
+      [name]: value,
+      months: name === 'mode' && value === 'year' ? [] : current.months,
+    }))
+    setResetError('')
+  }
+
+  function toggleResetMonth(month) {
+    setResetForm((current) => {
+      const selected = current.months.includes(month)
+      const months = selected
+        ? current.months.filter((item) => item !== month)
+        : [...current.months, month].sort((first, second) => first - second)
+
+      return { ...current, months }
+    })
+    setResetError('')
+  }
+
+  async function handleResetOperationalData(event) {
+    event.preventDefault()
+
+    if (!resetTarget || resettingData) {
+      return
+    }
+
+    const validationError = validateResetForm(resetForm)
+
+    if (validationError) {
+      setResetError(validationError)
+      return
+    }
+
+    setResettingData(true)
+    setResetError('')
+    setError('')
+    setSuccess('')
+
+    try {
+      await resetUserOperationalData({
+        user_id: resetTarget.id,
+        year: Number(resetForm.year),
+        mode: resetForm.mode,
+        months: resetForm.mode === 'months' ? resetForm.months : undefined,
+      })
+
+      await refreshProfiles()
+      setSuccess('Dados operacionais reiniciados com sucesso.')
+      setResetTarget(null)
+      setResetForm(getInitialResetForm())
+      setResetError('')
+    } catch {
+      setResetError('Não foi possível reiniciar os dados operacionais.')
+    } finally {
+      setResettingData(false)
+    }
+  }
+
   if (!isAdmin) {
     return (
       <section className="space-y-5">
@@ -344,7 +456,7 @@ function Admin() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[980px] w-full text-left">
+            <table className="min-w-[1120px] w-full text-left">
               <thead className="border-b border-white/10 bg-black/20">
                 <tr className="text-xs font-black uppercase tracking-[0.14em] text-zinc-600">
                   <th className="px-4 py-3">Usuário</th>
@@ -361,9 +473,10 @@ function Admin() {
                     key={profile.id}
                     profile={profile}
                     currentUserId={user?.id}
-                    disabled={deletingUser || updatingUser}
+                    disabled={deletingUser || updatingUser || resettingData}
                     onEdit={openEditModal}
                     onDelete={openDeleteModal}
+                    onReset={openResetModal}
                   />
                 ))}
                 {profiles.length === 0 && (
@@ -416,6 +529,19 @@ function Admin() {
           onConfirmationChange={setDeleteConfirmation}
           onClose={closeDeleteModal}
           onSubmit={handleDeleteUser}
+        />
+      )}
+
+      {resetTarget && (
+        <ResetOperationalDataModal
+          profile={resetTarget}
+          form={resetForm}
+          error={resetError}
+          resetting={resettingData}
+          onChange={updateResetField}
+          onToggleMonth={toggleResetMonth}
+          onClose={closeResetModal}
+          onSubmit={handleResetOperationalData}
         />
       )}
     </section>
@@ -619,7 +745,7 @@ function SelectField({ label, name, value, onChange, children }) {
   )
 }
 
-function UserRow({ profile, currentUserId, disabled, onEdit, onDelete }) {
+function UserRow({ profile, currentUserId, disabled, onEdit, onDelete, onReset }) {
   const isCurrentUser = profile.id === currentUserId
   const email = getProfileEmail(profile)
 
@@ -662,6 +788,15 @@ function UserRow({ profile, currentUserId, disabled, onEdit, onDelete }) {
           >
             <Pencil size={14} />
             Editar
+          </button>
+          <button
+            type="button"
+            onClick={() => onReset(profile)}
+            disabled={disabled}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-amber-500/25 bg-amber-950/10 px-3 text-xs font-black text-amber-100 transition hover:border-amber-400/45 hover:bg-amber-950/25 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RotateCcw size={14} />
+            Reiniciar dados
           </button>
           {isCurrentUser ? (
             <button
@@ -744,6 +879,154 @@ function DeleteUserModal({
           </PrimaryButton>
         </div>
       </form>
+    </div>
+  )
+}
+
+function ResetOperationalDataModal({
+  profile,
+  form,
+  error,
+  resetting,
+  onChange,
+  onToggleMonth,
+  onClose,
+  onSubmit,
+}) {
+  const canReset = isResetConfirmationValid(form.confirmation) && !getResetValidationError(form)
+  const selectedPeriod = getResetPeriodSummary(form)
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-sm">
+      <form
+        onSubmit={onSubmit}
+        className="mx-auto w-full max-w-3xl rounded-lg border border-red-500/25 bg-zinc-950/95 p-5 shadow-2xl shadow-black/60 sm:p-6"
+      >
+        <ModalHeader
+          eyebrow="Ação irreversível"
+          title="Reiniciar dados operacionais"
+          description="Esta ação apagará dados operacionais do usuário selecionado no período informado. Não haverá como recuperar essas informações depois da confirmação."
+          onClose={onClose}
+          closeLabel="Fechar reinício de dados"
+        />
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+            <InfoRow label="Nome" value={profile.nome || 'Sem nome'} strong />
+            <InfoRow label="Login/e-mail" value={getProfileEmail(profile)} />
+            <InfoRow label="Cargo" value={profile.cargo || 'Não informado'} />
+            <InfoRow label="Perfil" value={formatProfileRole(profile.perfil)} />
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-white/10 bg-black/25 p-4">
+            <div className="grid gap-3 sm:grid-cols-[1fr_0.65fr]">
+              <SelectField label="Período" name="mode" value={form.mode} onChange={onChange}>
+                <option value="year">Ano inteiro</option>
+                <option value="months">Meses específicos</option>
+              </SelectField>
+              <FormField label="Ano" name="year" type="number" value={form.year} onChange={onChange} />
+            </div>
+
+            {form.mode === 'months' && (
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
+                  Meses
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {monthOptions.map((month) => {
+                    const selected = form.months.includes(month.value)
+                    return (
+                      <button
+                        key={month.value}
+                        type="button"
+                        onClick={() => onToggleMonth(month.value)}
+                        className={`h-9 rounded-md border px-2 text-xs font-black transition ${
+                          selected
+                            ? 'border-red-500/40 bg-red-600 text-white shadow-lg shadow-red-950/20'
+                            : 'border-white/10 bg-black/25 text-zinc-400 hover:border-red-500/30 hover:text-white'
+                        }`}
+                      >
+                        {month.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-md border border-red-500/20 bg-red-950/15 px-3 py-2 text-sm font-black text-red-100">
+              Período selecionado: {selectedPeriod}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <ResetList
+            title="Serão apagados"
+            tone="red"
+            items={[
+              'Leads do período',
+              'Histórico dos leads do período',
+              'Metas mensais do período',
+            ]}
+          />
+          <ResetList
+            title="Serão preservados"
+            tone="green"
+            items={[
+              'Usuário',
+              'Login/e-mail',
+              'Perfil de acesso',
+              'Senha',
+              'Meta anual',
+              'Dados de outros períodos',
+            ]}
+          />
+        </div>
+
+        <label className="mt-5 block space-y-2">
+          <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
+            Para confirmar, digite: ESTOU DE ACORDO
+          </span>
+          <input
+            type="text"
+            name="confirmation"
+            value={form.confirmation}
+            onChange={onChange}
+            className="h-11 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-600 focus:border-red-500"
+          />
+        </label>
+
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <SecondaryButton onClick={onClose} disabled={resetting}>
+            Cancelar
+          </SecondaryButton>
+          <PrimaryButton type="submit" disabled={!canReset || resetting}>
+            {resetting && <Loader2 size={17} className="animate-spin" />}
+            Reiniciar definitivamente
+          </PrimaryButton>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ResetList({ title, items, tone }) {
+  const toneClass =
+    tone === 'green'
+      ? 'border-emerald-500/25 bg-emerald-950/10 text-emerald-100'
+      : 'border-red-500/25 bg-red-950/15 text-red-100'
+
+  return (
+    <div className={`rounded-lg border p-4 ${toneClass}`}>
+      <p className="text-xs font-black uppercase tracking-[0.14em]">{title}</p>
+      <ul className="mt-3 space-y-2 text-sm font-semibold leading-5">
+        {items.map((item) => (
+          <li key={item}>- {item}</li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -900,6 +1183,58 @@ function getCreateUserMessage(message = '') {
 
 function isDeleteConfirmationValid(value) {
   return String(value ?? '').trim().toLowerCase() === 'confirmo'
+}
+
+function isResetConfirmationValid(value) {
+  return String(value ?? '').trim().toLowerCase() === 'estou de acordo'
+}
+
+function validateResetForm(form) {
+  const periodError = getResetValidationError(form)
+
+  if (periodError) {
+    return periodError
+  }
+
+  if (!isResetConfirmationValid(form.confirmation)) {
+    return 'Digite ESTOU DE ACORDO para confirmar.'
+  }
+
+  return ''
+}
+
+function getResetValidationError(form) {
+  const year = Number(form.year)
+
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return 'Informe um ano válido.'
+  }
+
+  if (!['year', 'months'].includes(form.mode)) {
+    return 'Selecione um período válido.'
+  }
+
+  if (form.mode === 'months' && form.months.length === 0) {
+    return 'Selecione pelo menos um mês.'
+  }
+
+  return ''
+}
+
+function getResetPeriodSummary(form) {
+  const year = Number(form.year) || new Date().getFullYear()
+
+  if (form.mode === 'year') {
+    return `Todo o ano de ${year}`
+  }
+
+  if (form.months.length === 0) {
+    return 'Nenhum mês selecionado'
+  }
+
+  return form.months
+    .map((month) => `${monthOptions.find((item) => item.value === month)?.label}/${year}`)
+    .join(', ')
 }
 
 export default Admin

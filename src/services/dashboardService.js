@@ -35,6 +35,13 @@ const stageMetrics = [
 
 const inactiveStages = new Set(['fechado', 'perdido'])
 const revenueStages = new Set(['negociacao', 'demo', 'prospect'])
+const periodDateFields = [
+  'data_suspect',
+  'data_prospect',
+  'data_demo',
+  'data_negociacao',
+  'data_fechamento',
+]
 
 export async function getDashboardData(userId, mes, ano) {
   const numericMonth = Number(mes)
@@ -86,12 +93,25 @@ export async function getDashboardData(userId, mes, ano) {
 
   const today = getTodayISODate()
   const activeLeads = safeLeads.filter((lead) => !inactiveStages.has(lead.etapa_atual))
-  const overdueFollowUps = activeLeads.filter(
-    (lead) => lead.proximo_contato && lead.proximo_contato < today,
+  const periodLeads = safeLeads.filter((lead) =>
+    hasAnyDateInMonth(lead, numericMonth, numericYear),
   )
-  const caveiraLeads = activeLeads.filter((lead) => lead.temperatura === 'caveira')
-  const todayMissionLeads = activeLeads.filter((lead) => lead.proximo_contato === today)
-  const revenueInPlay = safeLeads
+  const activePeriodLeads = periodLeads.filter(
+    (lead) => !inactiveStages.has(lead.etapa_atual),
+  )
+  const overdueFollowUps = activeLeads.filter(
+    (lead) =>
+      lead.proximo_contato &&
+      lead.proximo_contato < today &&
+      isDateInMonth(lead.proximo_contato, numericMonth, numericYear),
+  )
+  const caveiraLeads = activePeriodLeads.filter((lead) => lead.temperatura === 'caveira')
+  const todayMissionLeads = activeLeads.filter(
+    (lead) =>
+      lead.proximo_contato === today &&
+      isDateInMonth(lead.proximo_contato, numericMonth, numericYear),
+  )
+  const revenueInPlay = periodLeads
     .filter((lead) => revenueStages.has(lead.etapa_atual))
     .reduce((total, lead) => total + Number(lead.valor_estimado || 0), 0)
 
@@ -110,7 +130,7 @@ export async function getDashboardData(userId, mes, ano) {
       overdueFollowUps,
       caveiraLeads,
       todayMissionLeads,
-      priorityTargets: getPriorityTargets(safeLeads),
+      priorityTargets: getPriorityTargets(periodLeads),
     },
   }
 }
@@ -127,6 +147,10 @@ function isDateInMonth(value, month, year) {
   const [dateYear, dateMonth] = String(value).slice(0, 10).split('-').map(Number)
 
   return dateYear === year && dateMonth === month
+}
+
+function hasAnyDateInMonth(lead, month, year) {
+  return periodDateFields.some((field) => isDateInMonth(lead[field], month, year))
 }
 
 function getTodayISODate() {

@@ -46,28 +46,33 @@ const stageAccentMap = {
 const stageDrilldownMap = {
   suspects: {
     stage: 'suspect',
+    dateField: 'data_suspect',
     title: 'Suspects',
-    subtitle: 'Leads cuja etapa atual é Suspect.',
+    subtitle: 'Leads que entraram como Suspect no período selecionado.',
   },
   prospects: {
     stage: 'prospect',
+    dateField: 'data_prospect',
     title: 'Prospects',
-    subtitle: 'Leads cuja etapa atual é Prospect.',
+    subtitle: 'Leads que chegaram em Prospect no período selecionado.',
   },
   demos: {
     stage: 'demo',
+    dateField: 'data_demo',
     title: 'Demos',
-    subtitle: 'Leads cuja etapa atual é Demo.',
+    subtitle: 'Leads que chegaram em Demo no período selecionado.',
   },
   negociacoes: {
     stage: 'negociacao',
+    dateField: 'data_negociacao',
     title: 'Negociações',
-    subtitle: 'Leads cuja etapa atual é Negociação.',
+    subtitle: 'Leads que chegaram em Negociação no período selecionado.',
   },
   fechamentos: {
     stage: 'fechado',
+    dateField: 'data_fechamento',
     title: 'Fechamentos',
-    subtitle: 'Leads cuja etapa atual é Fechamento.',
+    subtitle: 'Leads fechados no período selecionado.',
   },
 }
 
@@ -93,6 +98,21 @@ const temperatureChartColors = {
   Caveira: '#ef4444',
 }
 
+const monthOptions = [
+  { value: 1, label: 'Janeiro' },
+  { value: 2, label: 'Fevereiro' },
+  { value: 3, label: 'Março' },
+  { value: 4, label: 'Abril' },
+  { value: 5, label: 'Maio' },
+  { value: 6, label: 'Junho' },
+  { value: 7, label: 'Julho' },
+  { value: 8, label: 'Agosto' },
+  { value: 9, label: 'Setembro' },
+  { value: 10, label: 'Outubro' },
+  { value: 11, label: 'Novembro' },
+  { value: 12, label: 'Dezembro' },
+]
+
 function getCurrentPeriod() {
   const now = new Date()
 
@@ -104,12 +124,18 @@ function getCurrentPeriod() {
 
 function Dashboard({ onNavigate }) {
   const { user } = useAuth()
-  const [{ mes, ano }] = useState(getCurrentPeriod)
+  const [period, setPeriod] = useState(getCurrentPeriod)
+  const { mes, ano } = period
+  const [periodForm, setPeriodForm] = useState(() => ({
+    mes: String(getCurrentPeriod().mes),
+    ano: String(getCurrentPeriod().ano),
+  }))
   const [dashboardData, setDashboardData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [drilldown, setDrilldown] = useState(null)
   const [isRiskModalOpen, setIsRiskModalOpen] = useState(false)
+  const [isPeriodModalOpen, setIsPeriodModalOpen] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
   const [savingLeadEdit, setSavingLeadEdit] = useState(false)
   const [leadEditError, setLeadEditError] = useState('')
@@ -176,7 +202,7 @@ function Dashboard({ onNavigate }) {
       title: config.title,
       subtitle: config.subtitle,
       getLeads: (currentLeads) =>
-        currentLeads.filter((lead) => lead.etapa_atual === config.stage),
+        currentLeads.filter((lead) => isDateInMonth(lead[config.dateField], mes, ano)),
     })
   }
 
@@ -190,6 +216,58 @@ function Dashboard({ onNavigate }) {
 
   function closeRiskModal() {
     setIsRiskModalOpen(false)
+  }
+
+  function openPeriodModal() {
+    setPeriodForm({
+      mes: String(mes),
+      ano: String(ano),
+    })
+    setIsPeriodModalOpen(true)
+  }
+
+  function closePeriodModal() {
+    setIsPeriodModalOpen(false)
+  }
+
+  function updatePeriodField(event) {
+    const { name, value } = event.target
+    setPeriodForm((current) => ({
+      ...current,
+      [name]: value,
+    }))
+  }
+
+  function applyPeriod(event) {
+    event.preventDefault()
+
+    const nextMonth = Number(periodForm.mes)
+    const nextYear = Number(periodForm.ano)
+
+    if (!Number.isInteger(nextMonth) || nextMonth < 1 || nextMonth > 12) {
+      return
+    }
+
+    if (!Number.isInteger(nextYear) || nextYear < 2000 || nextYear > 2100) {
+      return
+    }
+
+    setPeriod({ mes: nextMonth, ano: nextYear })
+    setDrilldown(null)
+    setIsRiskModalOpen(false)
+    setIsPeriodModalOpen(false)
+  }
+
+  function applyCurrentMonth() {
+    const current = getCurrentPeriod()
+    setPeriod(current)
+    setPeriodForm({
+      mes: String(current.mes),
+      ano: String(current.ano),
+    })
+    setDrilldown(null)
+    setIsRiskModalOpen(false)
+    setIsPeriodModalOpen(false)
   }
 
   function openLeadDetails(lead) {
@@ -242,7 +320,8 @@ function Dashboard({ onNavigate }) {
           (lead) =>
             !inactiveStages.has(lead.etapa_atual) &&
             lead.proximo_contato &&
-            lead.proximo_contato < today,
+            lead.proximo_contato < today &&
+            isDateInMonth(lead.proximo_contato, mes, ano),
         )
       },
     },
@@ -250,8 +329,9 @@ function Dashboard({ onNavigate }) {
       title: 'Leads Caveira',
       subtitle: 'Leads ativos com temperatura Caveira.',
       getLeads: (currentLeads) =>
-        currentLeads.filter(
-          (lead) => !inactiveStages.has(lead.etapa_atual) && lead.temperatura === 'caveira',
+        getLeadsMovedInPeriod(currentLeads, mes, ano).filter(
+          (lead) =>
+            !inactiveStages.has(lead.etapa_atual) && lead.temperatura === 'caveira',
         ),
     },
     todayMission: {
@@ -259,7 +339,11 @@ function Dashboard({ onNavigate }) {
       subtitle: 'Leads com próximo contato marcado para hoje.',
       getLeads: (currentLeads) => {
         const today = getTodayISODate()
-        return currentLeads.filter((lead) => lead.proximo_contato === today)
+        return currentLeads.filter(
+          (lead) =>
+            lead.proximo_contato === today &&
+            isDateInMonth(lead.proximo_contato, mes, ano),
+        )
       },
     },
   }
@@ -300,6 +384,9 @@ function Dashboard({ onNavigate }) {
           <HeaderSignal
             label="Período"
             value={`${String(mes).padStart(2, '0')}/${ano}`}
+            onAction={openPeriodModal}
+            actionTitle="Selecionar período"
+            actionIcon={CalendarClock}
           />
           <HeaderSignal
             label="Risco operacional"
@@ -506,6 +593,17 @@ function Dashboard({ onNavigate }) {
           />,
           document.body,
         )}
+      {isPeriodModalOpen &&
+        createPortal(
+          <PeriodModal
+            form={periodForm}
+            onChange={updatePeriodField}
+            onApply={applyPeriod}
+            onCurrentMonth={applyCurrentMonth}
+            onClose={closePeriodModal}
+          />,
+          document.body,
+        )}
       {editingLead && (
         <EditLeadModal
           lead={editingLead}
@@ -524,7 +622,14 @@ function Dashboard({ onNavigate }) {
   )
 }
 
-function HeaderSignal({ label, value, danger = false, onAction, actionTitle }) {
+function HeaderSignal({
+  label,
+  value,
+  danger = false,
+  onAction,
+  actionTitle,
+  actionIcon: ActionIcon = Info,
+}) {
   return (
     <div className="min-w-0 border-white/10 px-5 py-4 sm:border-r sm:last:border-r-0">
       <div className="flex items-center gap-2">
@@ -539,7 +644,7 @@ function HeaderSignal({ label, value, danger = false, onAction, actionTitle }) {
             aria-label={actionTitle}
             className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-500/20 bg-red-950/10 text-red-300 transition hover:border-red-400/40 hover:bg-red-950/25 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-300/35"
           >
-            <Info size={14} />
+            <ActionIcon size={14} />
           </button>
         )}
       </div>
@@ -550,6 +655,94 @@ function HeaderSignal({ label, value, danger = false, onAction, actionTitle }) {
       >
         {value}
       </p>
+    </div>
+  )
+}
+
+function PeriodModal({ form, onChange, onApply, onCurrentMonth, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+      <form
+        onSubmit={onApply}
+        className="w-full max-w-lg rounded-lg border border-red-500/20 bg-zinc-950/95 p-5 shadow-2xl shadow-black/60 sm:p-6"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
+              Filtro do cockpit
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-white">Selecionar período</h2>
+            <p className="mt-2 text-sm font-medium leading-6 text-zinc-500">
+              Consulte metas, cards, drilldowns, risco, ritmo e gráficos de outro mês.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 text-zinc-500 transition hover:border-red-500/35 hover:text-white"
+            aria-label="Fechar seleção de período"
+          >
+            <X size={17} />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_0.75fr]">
+          <label className="space-y-2">
+            <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
+              Mês
+            </span>
+            <select
+              name="mes"
+              value={form.mes}
+              onChange={onChange}
+              className="h-11 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm font-semibold text-white outline-none transition focus:border-red-500"
+            >
+              {monthOptions.map((month) => (
+                <option key={month.value} value={month.value} className="bg-zinc-950">
+                  {month.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
+              Ano
+            </span>
+            <input
+              type="number"
+              name="ano"
+              min="2000"
+              max="2100"
+              value={form.ano}
+              onChange={onChange}
+              className="h-11 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm font-semibold text-white outline-none transition focus:border-red-500"
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center justify-center rounded-md border border-white/10 px-4 text-sm font-black text-zinc-300 transition hover:border-red-500/30 hover:text-white"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onCurrentMonth}
+            className="inline-flex h-10 items-center justify-center rounded-md border border-red-500/20 bg-red-950/15 px-4 text-sm font-black text-red-100 transition hover:border-red-400/40 hover:bg-red-950/30 hover:text-white"
+          >
+            Mês atual
+          </button>
+          <button
+            type="submit"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-black text-white shadow-[0_0_24px_rgba(220,38,38,0.24)] transition hover:bg-red-500"
+          >
+            Aplicar
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

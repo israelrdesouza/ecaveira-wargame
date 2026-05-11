@@ -51,6 +51,27 @@ export async function deleteUser(userId) {
   return data
 }
 
+export async function resetUserOperationalData(payload) {
+  const { data, error } = await supabase.functions.invoke('reset-user-operational-data', {
+    body: payload,
+  })
+
+  if (error) {
+    const functionErrorMessage = await getFunctionErrorMessage(error)
+    throw new Error(
+      functionErrorMessage ||
+        error.message ||
+        'Não foi possível reiniciar os dados operacionais.',
+    )
+  }
+
+  if (!data?.success) {
+    throw new Error(data?.message || 'Não foi possível reiniciar os dados operacionais.')
+  }
+
+  return data
+}
+
 async function getFunctionErrorMessage(error) {
   try {
     const context = error.context

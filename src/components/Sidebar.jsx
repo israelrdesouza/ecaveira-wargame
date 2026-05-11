@@ -92,7 +92,7 @@ function Sidebar({
       setModalGoal(null)
       setForm(getEmptyAnnualGoalForm(year))
       setIsEditing(true)
-      setModalError(error.message || 'NÃ£o foi possÃ­vel carregar a meta anual.')
+      setModalError(error.message || 'Não foi possível carregar a meta anual.')
     } finally {
       setIsLoadingGoal(false)
     }
@@ -172,7 +172,7 @@ function Sidebar({
 
       notifyAnnualGoalChanged(savedGoal.ano)
     } catch (error) {
-      setModalError(error.message || 'NÃ£o foi possÃ­vel salvar a meta anual.')
+      setModalError(error.message || 'Não foi possível salvar a meta anual.')
     } finally {
       setIsSaving(false)
     }
@@ -198,7 +198,7 @@ function Sidebar({
       setModalGoal(null)
       setForm(getEmptyAnnualGoalForm(modalYear))
       setIsEditing(true)
-      setModalSuccess('Meta anual excluÃ­da.')
+      setModalSuccess('Meta anual excluída.')
 
       if (Number(modalYear) === currentYear) {
         setAnnualGoal(null)
@@ -206,7 +206,7 @@ function Sidebar({
 
       notifyAnnualGoalChanged(modalYear)
     } catch (error) {
-      setModalError(error.message || 'NÃ£o foi possÃ­vel excluir a meta anual.')
+      setModalError(error.message || 'Não foi possível excluir a meta anual.')
     } finally {
       setIsSaving(false)
     }
@@ -293,12 +293,12 @@ function Sidebar({
                     {formatCurrencyBRLWithCents(annualGoalValue)}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-zinc-500">
-                    AtÃ© {formatAnnualGoalValidity(annualGoal?.vigente_ate)}
+                    Até {formatAnnualGoalValidity(annualGoal?.vigente_ate)}
                   </p>
                 </>
               ) : (
                 <p className="mt-1 text-xs font-semibold leading-5 text-zinc-500">
-                  NÃ£o configurada
+                  Não configurada
                 </p>
               )}
             </div>
@@ -338,7 +338,7 @@ function Sidebar({
               <div>
                 <p className="text-sm font-black text-white">Modo Ataque</p>
                 <p className="mt-0.5 text-xs font-medium text-zinc-500">
-                  Pipeline sob vigilÃ¢ncia
+                  Pipeline sob vigilância
                 </p>
               </div>
             </div>
@@ -627,7 +627,7 @@ function AnnualGoalModal({
               Meta anual
             </p>
             <h2 className="mt-2 text-2xl font-black leading-tight text-white">
-              ConfiguraÃ§Ã£o da Meta Anual
+              Configuração da Meta Anual
             </h2>
           </div>
           <button
@@ -658,7 +658,7 @@ function AnnualGoalModal({
             disabled={isLoading || isSaving}
             className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-white/10 px-3 text-xs font-black uppercase tracking-[0.1em] text-zinc-300 transition hover:border-red-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            PrÃ³ximo ano
+            Próximo ano
             <ChevronRight size={15} />
           </button>
         </div>
@@ -679,7 +679,7 @@ function AnnualGoalModal({
               disabled={!isEditing || isSaving}
             />
             <AnnualGoalField
-              label="Meta financeira padrÃ£o"
+              label="Meta financeira padrão"
               name="meta_financeira_padrao"
               type="text"
               inputMode="decimal"
@@ -689,7 +689,7 @@ function AnnualGoalModal({
               readValue={formatCurrencyBRLWithCents(parseLocalizedNumber(form.meta_financeira_padrao))}
             />
             <AnnualGoalField
-              label="Vigente atÃ©"
+              label="Vigente até"
               name="vigente_ate"
               type="date"
               value={form.vigente_ate}
@@ -698,7 +698,7 @@ function AnnualGoalModal({
             />
             <label className="space-y-2 md:col-span-3">
               <span className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">
-                ObservaÃ§Ã£o
+                Observação
               </span>
               <textarea
                 name="observacao"
@@ -859,15 +859,15 @@ function validateAnnualGoalForm(form) {
   const annualGoalValue = parseLocalizedNumber(form.meta_financeira_padrao)
 
   if (!Number.isInteger(year) || year <= 0) {
-    return 'Informe um ano vÃ¡lido.'
+    return 'Informe um ano válido.'
   }
 
   if (String(form.meta_financeira_padrao ?? '').trim() === '') {
-    return 'Informe a meta financeira padrÃ£o.'
+    return 'Informe a meta financeira padrão.'
   }
 
   if (!Number.isFinite(annualGoalValue) || annualGoalValue < 0) {
-    return 'Informe uma meta financeira padrÃ£o maior ou igual a 0.'
+    return 'Informe uma meta financeira padrão maior ou igual a 0.'
   }
 
   return ''
@@ -922,7 +922,7 @@ function getDateInputValue(value) {
 
 function formatAnnualGoalValidity(value) {
   if (!value) {
-    return 'sem vigÃªncia'
+    return 'sem vigência'
   }
 
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
