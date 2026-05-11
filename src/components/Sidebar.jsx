@@ -128,13 +128,15 @@ function Sidebar({
   )
   const tacticalIndicators = getTacticalIndicators(tacticalSummary, isLoadingSummary)
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async ({ showLoading = false } = {}) => {
     if (!isAdmin) {
       setNotifications([])
       return
     }
 
-    setIsLoadingNotifications(true)
+    if (showLoading) {
+      setIsLoadingNotifications(true)
+    }
 
     try {
       const data = await listUnreadNotifications()
@@ -142,13 +144,27 @@ function Sidebar({
     } catch {
       setNotifications([])
     } finally {
-      setIsLoadingNotifications(false)
+      if (showLoading) {
+        setIsLoadingNotifications(false)
+      }
     }
   }, [isAdmin])
 
   useEffect(() => {
+    if (!isAdmin) {
+      setNotifications([])
+      return undefined
+    }
+
     loadNotifications()
-  }, [loadNotifications])
+    const intervalId = window.setInterval(() => {
+      loadNotifications()
+    }, 30000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isAdmin, loadNotifications])
 
   async function loadModalAnnualGoal(year) {
     if (!user?.id) {
@@ -194,9 +210,9 @@ function Sidebar({
     setIsProfileModalOpen(false)
   }
 
-  function openNotificationsModal() {
+  async function openNotificationsModal() {
     setIsNotificationsOpen(true)
-    loadNotifications()
+    await loadNotifications({ showLoading: true })
   }
 
   async function markAsRead(notificationId) {
