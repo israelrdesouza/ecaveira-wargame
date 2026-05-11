@@ -11,7 +11,7 @@ import {
   Thermometer,
   X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { mockLeads } from '../data/mockData'
 import { getLeads, moveLeadStage, updateLead } from '../services/leadService'
 import { ORIGINS, PRODUCTS, TEMPERATURES } from '../utils/constants'
@@ -32,7 +32,24 @@ const FUNNEL_STAGES = [
   { label: 'Congelado', value: 'congelado' },
 ]
 
-const filterStages = ['Todos', ...FUNNEL_STAGES.map((stage) => stage.label)]
+const STAGE_FILTERS = [
+  { label: 'Todos', value: '' },
+  ...FUNNEL_STAGES,
+]
+const TEMPERATURE_FILTERS = [
+  { label: 'Frio', value: 'frio' },
+  { label: 'Morno', value: 'morno' },
+  { label: 'Quente', value: 'quente' },
+  { label: 'Caveira', value: 'caveira' },
+]
+const SORT_OPTIONS = [
+  { label: 'Mais recentes', value: 'recent' },
+  { label: 'Mais antigos', value: 'oldest' },
+  { label: 'Próximo contato', value: 'nextContact' },
+  { label: 'Maior valor', value: 'highestValue' },
+  { label: 'Menor valor', value: 'lowestValue' },
+  { label: 'Empresa A-Z', value: 'companyAz' },
+]
 const cleanedCommercialFields = new Set(['empresa', 'contato', 'produto_outro', 'origem_outro'])
 const uppercaseCommercialFields = new Set(['proxima_acao', 'observacao'])
 
@@ -45,8 +62,26 @@ function Leads() {
   const [editError, setEditError] = useState('')
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [selectedStage, setSelectedStage] = useState('')
+  const [selectedTemperature, setSelectedTemperature] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortOption, setSortOption] = useState('recent')
+  const [isSortOpen, setIsSortOpen] = useState(false)
   const hasRealLeads = leads.length > 0
-  const displayedLeads = error && !hasRealLeads ? mockLeads : leads
+  const sourceLeads = error && !hasRealLeads ? mockLeads : leads
+  const displayedLeads = useMemo(
+    () =>
+      getFilteredAndSortedLeads(sourceLeads, {
+        selectedStage,
+        selectedTemperature,
+        searchTerm,
+        sortOption,
+      }),
+    [sourceLeads, searchTerm, selectedStage, selectedTemperature, sortOption],
+  )
+  const hasActiveFilters = Boolean(selectedStage || selectedTemperature || searchTerm.trim())
+  const selectedSortLabel =
+    SORT_OPTIONS.find((option) => option.value === sortOption)?.label ?? 'Ordenar'
 
   useEffect(() => {
     let isMounted = true
@@ -152,6 +187,8 @@ function Leads() {
             <Search size={18} className="shrink-0 text-zinc-500" />
             <input
               type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Buscar por empresa, pessoa ou contato"
               className="w-full min-w-0 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
             />
@@ -163,18 +200,61 @@ function Leads() {
             <Filter size={17} />
             Filtros
           </button>
-          <button
-            type="button"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-500"
-          >
-            <SlidersHorizontal size={17} />
-            Ordenar
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsSortOpen((current) => !current)}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-500 lg:w-auto"
+            >
+              <SlidersHorizontal size={17} />
+              Ordenar
+            </button>
+            {isSortOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-md border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50">
+                <div className="border-b border-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-zinc-600">
+                  {selectedSortLabel}
+                </div>
+                {SORT_OPTIONS.map((option) => {
+                  const selected = option.value === sortOption
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setSortOption(option.value)
+                        setIsSortOpen(false)
+                      }}
+                      className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-bold transition ${
+                        selected
+                          ? 'bg-red-600 text-white'
+                          : 'text-zinc-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      {option.label}
+                      {selected && <span className="text-xs">Ativo</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 space-y-3">
-          <FilterGroup items={filterStages} active="Todos" />
-          <FilterGroup items={TEMPERATURES} active="Caveira" subtle />
+          <FilterGroup
+            items={STAGE_FILTERS}
+            active={selectedStage}
+            onSelect={(value) => setSelectedStage(value)}
+          />
+          <FilterGroup
+            items={TEMPERATURE_FILTERS}
+            active={selectedTemperature}
+            onSelect={(value) =>
+              setSelectedTemperature((current) => (current === value ? '' : value))
+            }
+            subtle
+          />
         </div>
       </div>
 
@@ -192,7 +272,7 @@ function Leads() {
         </div>
       )}
 
-      {!isLoading && !error && !hasRealLeads ? (
+      {!isLoading && !error && !hasRealLeads && !hasActiveFilters ? (
         <div className="rounded-lg border border-white/10 bg-zinc-900/70 p-8 text-center shadow-xl shadow-black/20 backdrop-blur">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-red-500/25 bg-red-950/25 text-red-300">
             <Flame size={23} />
@@ -202,6 +282,18 @@ function Leads() {
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-sm font-medium leading-6 text-zinc-500">
             Assim que um lead for salvo no Supabase, ele aparecerá neste radar.
+          </p>
+        </div>
+      ) : !isLoading && displayedLeads.length === 0 ? (
+        <div className="rounded-lg border border-white/10 bg-zinc-900/70 p-8 text-center shadow-xl shadow-black/20 backdrop-blur">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-red-500/25 bg-red-950/25 text-red-300">
+            <Search size={23} />
+          </div>
+          <h2 className="mt-4 text-lg font-black text-white">
+            Nenhum lead encontrado com os filtros selecionados.
+          </h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm font-medium leading-6 text-zinc-500">
+            Ajuste a busca, etapa, temperatura ou ordenação para consultar outros alvos.
           </p>
         </div>
       ) : (
@@ -320,6 +412,128 @@ function LeadTable({ leads, isLoading, movingLeadId, onMoveStage, onOpenLead }) 
       </div>
     </div>
   )
+}
+
+function getFilteredAndSortedLeads(leads, filters) {
+  const { selectedStage, selectedTemperature, searchTerm, sortOption } = filters
+  const normalizedSearch = normalizeSearchValue(searchTerm)
+
+  return [...(leads ?? [])]
+    .filter((lead) => {
+      if (selectedStage && normalizeStageValue(lead.etapa_atual ?? lead.stage) !== selectedStage) {
+        return false
+      }
+
+      if (
+        selectedTemperature &&
+        normalizeTemperatureValue(lead.temperatura ?? lead.temp) !== selectedTemperature
+      ) {
+        return false
+      }
+
+      if (!normalizedSearch) {
+        return true
+      }
+
+      return getLeadSearchText(lead).includes(normalizedSearch)
+    })
+    .sort((leadA, leadB) => compareLeads(leadA, leadB, sortOption))
+}
+
+function getLeadSearchText(lead) {
+  return normalizeSearchValue(
+    [
+      getLeadCompany(lead),
+      lead.contato ?? lead.contact,
+      lead.celular ?? lead.phone,
+      formatPhoneBR(lead.celular ?? lead.phone),
+      lead.produto ?? lead.product,
+      lead.origem ?? lead.origin,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+}
+
+function normalizeSearchValue(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+    .trim()
+}
+
+function compareLeads(leadA, leadB, sortOption) {
+  switch (sortOption) {
+    case 'oldest':
+      return compareDates(getLeadCreatedAt(leadA), getLeadCreatedAt(leadB), 'asc')
+    case 'nextContact':
+      return compareNullableDates(getLeadRawNextContact(leadA), getLeadRawNextContact(leadB))
+    case 'highestValue':
+      return getLeadEstimatedValue(leadB) - getLeadEstimatedValue(leadA)
+    case 'lowestValue':
+      return getLeadEstimatedValue(leadA) - getLeadEstimatedValue(leadB)
+    case 'companyAz':
+      return getLeadCompany(leadA).localeCompare(getLeadCompany(leadB), 'pt-BR', {
+        sensitivity: 'base',
+      })
+    case 'recent':
+    default:
+      return compareDates(getLeadCreatedAt(leadA), getLeadCreatedAt(leadB), 'desc')
+  }
+}
+
+function compareDates(valueA, valueB, direction = 'asc') {
+  const dateA = getDateTime(valueA)
+  const dateB = getDateTime(valueB)
+  const fallbackA = Number.isFinite(dateA) ? dateA : 0
+  const fallbackB = Number.isFinite(dateB) ? dateB : 0
+
+  return direction === 'desc' ? fallbackB - fallbackA : fallbackA - fallbackB
+}
+
+function compareNullableDates(valueA, valueB) {
+  const hasValueA = Boolean(valueA)
+  const hasValueB = Boolean(valueB)
+
+  if (!hasValueA && !hasValueB) return 0
+  if (!hasValueA) return 1
+  if (!hasValueB) return -1
+
+  return compareDates(valueA, valueB, 'asc')
+}
+
+function getDateTime(value) {
+  if (!value) {
+    return Number.NaN
+  }
+
+  const date = new Date(value)
+  return date.getTime()
+}
+
+function getLeadCreatedAt(lead) {
+  return lead.created_at ?? lead.createdAt ?? lead.created ?? ''
+}
+
+function getLeadRawNextContact(lead) {
+  return lead.proximo_contato ?? lead.next ?? ''
+}
+
+function getLeadEstimatedValue(lead) {
+  const value = lead.valor_estimado ?? lead.value ?? 0
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0
+  }
+
+  const normalizedValue = String(value)
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+  const numericValue = Number(normalizedValue)
+
+  return Number.isFinite(numericValue) ? numericValue : 0
 }
 
 export function EditLeadModal({ lead, error, isSaving, onClose, onSave }) {
@@ -736,24 +950,28 @@ function StageSelect({ lead, isMoving, onMoveStage }) {
   )
 }
 
-function FilterGroup({ items, active, subtle = false }) {
+function FilterGroup({ items, active, onSelect, subtle = false }) {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((item) => {
-        const selected = item === active
+        const label = typeof item === 'string' ? item : item.label
+        const value = typeof item === 'string' ? item : item.value
+        const selected = value === active
+
         return (
           <button
-            key={item}
+            key={value || label}
             type="button"
+            onClick={() => onSelect?.(value)}
             className={`rounded-md border px-3 py-2 text-xs font-black transition ${
               selected
                 ? 'border-red-500/40 bg-red-600 text-white shadow-lg shadow-red-950/25'
                 : subtle
                   ? 'border-white/10 bg-black/20 text-zinc-400 hover:border-red-500/30 hover:text-white'
-                  : 'border-white/10 bg-black/30 text-zinc-400 hover:border-red-500/30 hover:text-white'
+                : 'border-white/10 bg-black/30 text-zinc-400 hover:border-red-500/30 hover:text-white'
             }`}
           >
-            {item}
+            {label}
           </button>
         )
       })}
@@ -906,7 +1124,7 @@ function formatStage(stage) {
 }
 
 function formatTemperature(temperature) {
-  const normalized = String(temperature || 'morno').toLowerCase()
+  const normalized = normalizeTemperatureValue(temperature)
   const temperatureLabels = {
     frio: 'Frio',
     morno: 'Morno',
@@ -915,6 +1133,17 @@ function formatTemperature(temperature) {
   }
 
   return temperatureLabels[normalized] ?? temperature
+}
+
+function normalizeTemperatureValue(temperature) {
+  const normalized = String(temperature || 'morno')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  return ['frio', 'morno', 'quente', 'caveira'].includes(normalized)
+    ? normalized
+    : 'morno'
 }
 
 function getEditFormFromLead(lead) {
