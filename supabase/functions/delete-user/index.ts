@@ -9,6 +9,8 @@ const corsHeaders = {
 
 type DeleteUserPayload = {
   user_id?: string
+  userId?: string
+  id?: string
 }
 
 serve(async (req) => {
@@ -96,7 +98,7 @@ serve(async (req) => {
     return jsonResponse({ success: false, message: 'Payload inválido.' }, 400)
   }
 
-  const targetUserId = payload.user_id?.trim()
+  const targetUserId = String(payload.user_id ?? payload.userId ?? payload.id ?? '').trim()
 
   if (!targetUserId) {
     return jsonResponse({ success: false, message: 'Usuário inválido.' }, 400)
@@ -109,23 +111,74 @@ serve(async (req) => {
     )
   }
 
+  const { data: targetProfile, error: targetProfileError } = await adminClient
+    .from('profiles')
+    .select('id, email, nome')
+    .eq('id', targetUserId)
+    .maybeSingle()
+
+  if (targetProfileError) {
+    return jsonResponse(
+      { success: false, message: 'Não foi possível validar o usuário selecionado.' },
+      500,
+    )
+  }
+
+  const { data: targetAuthUser, error: targetAuthError } =
+    await adminClient.auth.admin.getUserById(targetUserId)
+
+  if (targetAuthError || !targetAuthUser?.user) {
+    if (!targetProfile) {
+      return jsonResponse({ success: false, message: 'Usuário não encontrado.' }, 404)
+    }
+
+    const { error: unlinkNotificationsError } = await adminClient
+      .from('notificacoes')
+      .update({ user_id: null })
+      .eq('user_id', targetUserId)
+
+    if (unlinkNotificationsError) {
+      return jsonResponse(
+        { success: false, message: 'Não foi possível desvincular notificações do usuário.' },
+        500,
+      )
+    }
+
+    const { error: orphanProfileDeleteError } = await adminClient
+      .from('profiles')
+      .delete()
+      .eq('id', targetUserId)
+
+    if (orphanProfileDeleteError) {
+      return jsonResponse(
+        { success: false, message: 'Usuário não encontrado no Auth e perfil não removido.' },
+        500,
+      )
+    }
+
+    return jsonResponse(
+      { success: true, message: 'Perfil órfão removido com sucesso.' },
+      200,
+    )
+  }
+
+  const { error: unlinkNotificationsError } = await adminClient
+    .from('notificacoes')
+    .update({ user_id: null })
+    .eq('user_id', targetUserId)
+
+  if (unlinkNotificationsError) {
+    return jsonResponse(
+      { success: false, message: 'Não foi possível desvincular notificações do usuário.' },
+      500,
+    )
+  }
+
   const { error: deleteAuthError } = await adminClient.auth.admin.deleteUser(targetUserId)
 
   if (deleteAuthError) {
     return jsonResponse(
       { success: false, message: 'Não foi possível excluir o usuário.' },
-      500,
-    )
-  }
-
-  const { error: deleteProfileError } = await adminClient
-    .from('profiles')
-    .delete()
-    .eq('id', targetUserId)
-
-  if (deleteProfileError) {
-    return jsonResponse(
-      { success: false, message: 'Usuário removido do Auth, mas o perfil não foi removido.' },
       500,
     )
   }

@@ -34,9 +34,20 @@ export async function listUsers() {
 }
 
 export async function deleteUser(userId) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('Sessão expirada. Faça login novamente.')
+  }
+
   const { data, error } = await supabase.functions.invoke('delete-user', {
     body: {
       user_id: userId,
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
     },
   })
 

@@ -15,7 +15,6 @@ import {
   updateCurrentUserPassword,
 } from '../services/authService'
 import { createInviteAcceptedNotification } from '../services/notificationService'
-import { getProfileById, markInviteAccepted } from '../services/profileService'
 import { supabase } from '../lib/supabase'
 
 function ResetPassword({ onBackToLogin }) {
@@ -178,29 +177,49 @@ function ResetPassword({ onBackToLogin }) {
     }
 
     try {
-      const { data } = await getCurrentAuthSession()
-      const currentUserId = data?.session?.user?.id
-      let currentProfile = null
+      const {
+        data: { user: currentUser },
+        error: currentUserError,
+      } = await supabase.auth.getUser()
 
-      try {
-        currentProfile = await getProfileById(currentUserId)
-      } catch {
-        currentProfile = null
+      if (currentUserError || !currentUser?.id) {
+        throw currentUserError || new Error('Usuário autenticado não encontrado.')
+      }
+
+      const { data: currentProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id,nome,email,convite_status')
+        .eq('id', currentUser.id)
+        .maybeSingle()
+
+      if (profileError) {
+        console.warn('Não foi possível consultar o perfil para notificação interna.')
       }
 
       const shouldNotifyInviteAccepted =
-        currentProfile &&
-        currentProfile.convite_status !== 'aceito' &&
-        !currentProfile.convite_aceito_em
+        currentProfile && currentProfile.convite_status !== 'aceito'
 
-      await markInviteAccepted(currentUserId)
+      const now = new Date().toISOString()
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({
+          convite_status: 'aceito',
+          convite_aceito_em: now,
+          ultimo_login_em: now,
+          updated_at: now,
+        })
+        .eq('id', currentUser.id)
+
+      if (profileUpdateError) {
+        console.warn('Não foi possível atualizar o status do convite.')
+      }
 
       if (shouldNotifyInviteAccepted) {
         try {
           await createInviteAcceptedNotification({
-            userId: currentUserId,
+            userId: currentUser.id,
             name: currentProfile.nome,
-            email: currentProfile.email,
+            email: currentProfile.email || currentUser.email,
           })
         } catch {
           console.warn('Não foi possível registrar notificação interna.')
