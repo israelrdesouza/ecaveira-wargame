@@ -38,9 +38,11 @@ function ResetPassword({ onBackToLogin }) {
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
       const recoveryCode = searchParams.get('code')
       const urlError = searchParams.get('error') || searchParams.get('error_code')
+      const authLinkType = hashParams.get('type')
       const hasRecoveryHint =
         Boolean(recoveryCode) ||
-        hashParams.get('type') === 'recovery' ||
+        authLinkType === 'recovery' ||
+        authLinkType === 'invite' ||
         hashParams.has('access_token') ||
         window.sessionStorage.getItem('ecaveira_password_recovery') === 'true'
 
@@ -140,7 +142,7 @@ function ResetPassword({ onBackToLogin }) {
               />
             </div>
             <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-red-300">
-              Recuperação segura
+              Acesso seguro
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-white">
               Criar nova senha
@@ -150,14 +152,14 @@ function ResetPassword({ onBackToLogin }) {
           {isCheckingSession && (
             <div className="mt-6 flex items-center justify-center gap-2 rounded-md border border-white/10 bg-black/25 p-4 text-sm font-semibold text-zinc-400">
               <Loader2 size={17} className="animate-spin text-red-300" />
-              Validando link de recuperação...
+              Validando link seguro...
             </div>
           )}
 
           {!isCheckingSession && !hasRecoverySession && (
             <div className="mt-6 space-y-4">
               <div className="rounded-md border border-red-500/25 bg-red-950/25 px-3 py-3 text-sm font-semibold leading-6 text-red-200">
-                Link inválido ou expirado. Solicite uma nova recuperação de senha.
+                Link inválido ou expirado. Solicite um novo convite ou recuperação de senha.
               </div>
               <button
                 type="button"

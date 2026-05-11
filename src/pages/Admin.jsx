@@ -1,5 +1,4 @@
 import {
-  Copy,
   Loader2,
   Pencil,
   Plus,
@@ -64,7 +63,6 @@ function Admin() {
   const [newUserForm, setNewUserForm] = useState(initialNewUserForm)
   const [newUserError, setNewUserError] = useState('')
   const [newUserSuccess, setNewUserSuccess] = useState('')
-  const [temporaryPassword, setTemporaryPassword] = useState('')
   const [creatingUser, setCreatingUser] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(null)
@@ -124,7 +122,6 @@ function Admin() {
     setNewUserForm(initialNewUserForm)
     setNewUserError('')
     setNewUserSuccess('')
-    setTemporaryPassword('')
     setIsNewUserOpen(true)
   }
 
@@ -137,7 +134,6 @@ function Admin() {
     setNewUserForm(initialNewUserForm)
     setNewUserError('')
     setNewUserSuccess('')
-    setTemporaryPassword('')
   }
 
   function updateNewUserField(event) {
@@ -147,14 +143,13 @@ function Admin() {
       [name]: name === 'ativo' ? value === 'true' : value,
     }))
     setNewUserError('')
+    setNewUserSuccess('')
   }
 
   async function handleCreateUser(event) {
     event.preventDefault()
     setNewUserError('')
     setNewUserSuccess('')
-    setTemporaryPassword('')
-
     const normalizedPayload = normalizeUserForm(newUserForm)
     const validationError = validateUserForm(normalizedPayload, { requireEmail: true })
 
@@ -166,25 +161,15 @@ function Admin() {
     setCreatingUser(true)
 
     try {
-      const result = await createUser(normalizedPayload)
+      await createUser(normalizedPayload)
 
-      setNewUserSuccess('Usuário criado com sucesso.')
-      setTemporaryPassword(result.temporaryPassword || '')
+      setNewUserSuccess('Convite enviado com sucesso para o usuário.')
       await refreshProfiles()
     } catch (createError) {
       setNewUserError(getCreateUserMessage(createError.message))
     } finally {
       setCreatingUser(false)
     }
-  }
-
-  async function copyTemporaryPassword() {
-    if (!temporaryPassword) {
-      return
-    }
-
-    await navigator.clipboard.writeText(temporaryPassword)
-    setNewUserSuccess('Senha provisória copiada. Entregue ao usuário por canal seguro.')
   }
 
   function openEditModal(profile) {
@@ -500,12 +485,10 @@ function Admin() {
           form={newUserForm}
           error={newUserError}
           success={newUserSuccess}
-          temporaryPassword={temporaryPassword}
           creating={creatingUser}
           onChange={updateNewUserField}
           onClose={closeNewUserModal}
           onSubmit={handleCreateUser}
-          onCopyPassword={copyTemporaryPassword}
         />
       )}
 
@@ -552,12 +535,10 @@ function NewUserModal({
   form,
   error,
   success,
-  temporaryPassword,
   creating,
   onChange,
   onClose,
   onSubmit,
-  onCopyPassword,
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
@@ -568,7 +549,7 @@ function NewUserModal({
         <ModalHeader
           eyebrow="Admin"
           title="Novo usuário"
-          description="Crie o acesso sem abrir cadastro público. A senha provisória será gerada no servidor."
+          description="Crie o acesso sem abrir cadastro público. O usuário receberá um e-mail para criar a senha."
           onClose={onClose}
           closeLabel="Fechar novo usuário"
         />
@@ -580,39 +561,20 @@ function NewUserModal({
         {success && (
           <div className="mt-4 flex gap-2 rounded-md border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 text-sm font-semibold text-emerald-200">
             <ShieldCheck size={17} className="mt-0.5 shrink-0" />
-            <span>{success}</span>
-          </div>
-        )}
-
-        {temporaryPassword && (
-          <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-950/15 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-300">
-              Senha provisória
-            </p>
-            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <code className="min-w-0 flex-1 break-all rounded-md border border-white/10 bg-black/35 px-3 py-2 text-sm font-black text-white">
-                {temporaryPassword}
-              </code>
-              <button
-                type="button"
-                onClick={onCopyPassword}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-amber-500/25 px-3 text-sm font-black text-amber-100 transition hover:border-amber-400/45 hover:text-white"
-              >
-                <Copy size={16} />
-                Copiar
-              </button>
-            </div>
-            <p className="mt-2 text-xs font-semibold leading-5 text-amber-100/70">
-              Entregue esta senha por canal seguro e oriente o usuário a alterá-la no primeiro acesso.
-            </p>
+            <span>
+              {success}
+              <span className="mt-1 block text-xs font-semibold leading-5 text-emerald-100/75">
+                O usuário receberá um e-mail para criar sua senha de acesso.
+              </span>
+            </span>
           </div>
         )}
 
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <SecondaryButton onClick={onClose}>Cancelar</SecondaryButton>
-          <PrimaryButton type="submit" disabled={creating || Boolean(temporaryPassword)}>
+          <PrimaryButton type="submit" disabled={creating || Boolean(success)}>
             {creating && <Loader2 size={17} className="animate-spin" />}
-            Criar usuário
+            Enviar convite
           </PrimaryButton>
         </div>
       </form>

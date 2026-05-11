@@ -8,6 +8,7 @@ const corsHeaders = {
 }
 
 const allowedProfiles = new Set(['admin', 'operador'])
+const inviteRedirectTo = 'https://ecaveira-cockpit.vercel.app/reset-password'
 
 type CreateUserPayload = {
   nome?: string
@@ -122,34 +123,30 @@ serve(async (req) => {
     return jsonResponse({ success: false, message: 'E-mail já cadastrado.' }, 409)
   }
 
-  const temporaryPassword = generateTemporaryPassword()
-
-  const { data: createdUserData, error: createUserError } =
-    await adminClient.auth.admin.createUser({
-      email: normalizedPayload.email,
-      password: temporaryPassword,
-      email_confirm: true,
-      user_metadata: {
+  const { data: invitedUserData, error: inviteUserError } =
+    await adminClient.auth.admin.inviteUserByEmail(normalizedPayload.email, {
+      data: {
         nome: normalizedPayload.nome,
         cargo: normalizedPayload.cargo,
         perfil: normalizedPayload.perfil,
-        primeiro_acesso: true,
+        primeiro_acesso: false,
       },
+      redirectTo: inviteRedirectTo,
     })
 
-  if (createUserError || !createdUserData.user) {
+  if (inviteUserError || !invitedUserData.user) {
     return jsonResponse(
       {
         success: false,
-        message: normalizeCreateUserError(createUserError?.message),
+        message: normalizeInviteUserError(inviteUserError?.message),
       },
-      createUserError?.message?.toLowerCase().includes('already') ? 409 : 500,
+      inviteUserError?.message?.toLowerCase().includes('already') ? 409 : 500,
     )
   }
 
   const { error: profileError } = await adminClient.from('profiles').upsert(
     {
-      id: createdUserData.user.id,
+      id: invitedUserData.user.id,
       nome: normalizedPayload.nome,
       email: normalizedPayload.email,
       cargo: normalizedPayload.cargo,
@@ -165,7 +162,7 @@ serve(async (req) => {
       {
         success: false,
         message:
-          'Usuário criado no Auth, mas não foi possível atualizar o perfil. Verifique a tabela profiles.',
+          'Convite enviado, mas não foi possível atualizar o perfil. Verifique a tabela profiles.',
       },
       500,
     )
@@ -174,10 +171,9 @@ serve(async (req) => {
   return jsonResponse(
     {
       success: true,
-      message: 'Usuário criado com sucesso.',
-      temporaryPassword,
+      message: 'Convite enviado com sucesso para o usuário.',
       user: {
-        id: createdUserData.user.id,
+        id: invitedUserData.user.id,
         email: normalizedPayload.email,
         nome: normalizedPayload.nome,
         cargo: normalizedPayload.cargo,
@@ -245,48 +241,7 @@ function normalizeEmail(value?: string) {
   return String(value ?? '').trim().toLowerCase()
 }
 
-function generateTemporaryPassword() {
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-  const lower = 'abcdefghijkmnopqrstuvwxyz'
-  const numbers = '23456789'
-  const symbols = '!@#$%&*?'
-  const all = `${upper}${lower}${numbers}${symbols}`
-
-  const required = [
-    pickRandom(upper),
-    pickRandom(lower),
-    pickRandom(numbers),
-    pickRandom(symbols),
-  ]
-
-  const remaining = Array.from({ length: 12 }, () => pickRandom(all))
-
-  return shuffle([...required, ...remaining]).join('')
-}
-
-function pickRandom(source: string) {
-  const random = new Uint32Array(1)
-  crypto.getRandomValues(random)
-  return source[random[0] % source.length]
-}
-
-function shuffle(values: string[]) {
-  const copy = [...values]
-
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const random = new Uint32Array(1)
-    crypto.getRandomValues(random)
-
-    const swapIndex = random[0] % (index + 1)
-    const current = copy[index]
-    copy[index] = copy[swapIndex]
-    copy[swapIndex] = current
-  }
-
-  return copy
-}
-
-function normalizeCreateUserError(message?: string) {
+function normalizeInviteUserError(message?: string) {
   const normalizedMessage = message?.toLowerCase() ?? ''
 
   if (
@@ -297,9 +252,5 @@ function normalizeCreateUserError(message?: string) {
     return 'E-mail já cadastrado.'
   }
 
-  if (normalizedMessage.includes('password')) {
-    return 'Não foi possível criar a senha provisória do usuário.'
-  }
-
-  return 'Erro ao criar usuário.'
+  return 'Erro ao enviar convite de usuário.'
 }
