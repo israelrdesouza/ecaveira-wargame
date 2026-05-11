@@ -20,6 +20,8 @@ import {
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+import AnimatedNumber, { usePrefersReducedMotion } from '../components/AnimatedNumber'
+import AnimatedProgressBar from '../components/AnimatedProgressBar'
 import StatCard from '../components/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { getDashboardData } from '../services/dashboardService'
@@ -139,6 +141,7 @@ function Dashboard({ onNavigate }) {
   const [editingLead, setEditingLead] = useState(null)
   const [savingLeadEdit, setSavingLeadEdit] = useState(false)
   const [leadEditError, setLeadEditError] = useState('')
+  const [dashboardAnimationKey, setDashboardAnimationKey] = useState(0)
 
   useEffect(() => {
     let isMounted = true
@@ -157,6 +160,7 @@ function Dashboard({ onNavigate }) {
 
         if (isMounted) {
           setDashboardData(data)
+          setDashboardAnimationKey((currentKey) => currentKey + 1)
         }
       } catch (dashboardError) {
         if (isMounted) {
@@ -294,6 +298,7 @@ function Dashboard({ onNavigate }) {
       const data = await getDashboardData(user.id, mes, ano)
 
       setDashboardData(data)
+      setDashboardAnimationKey((currentKey) => currentKey + 1)
       setDrilldown((current) =>
         current?.getLeads
           ? {
@@ -379,7 +384,13 @@ function Dashboard({ onNavigate }) {
         <div className="grid border-t border-white/10 bg-black/20 sm:grid-cols-3">
           <HeaderSignal
             label="Receita em jogo"
-            value={formatCurrencyBRL(auxiliary?.revenueInPlay ?? 0)}
+            value={
+              <AnimatedNumber
+                value={auxiliary?.revenueInPlay ?? 0}
+                format={formatCurrencyBRL}
+                animationKey={dashboardAnimationKey}
+              />
+            }
           />
           <HeaderSignal
             label="Período"
@@ -390,7 +401,15 @@ function Dashboard({ onNavigate }) {
           />
           <HeaderSignal
             label="Risco operacional"
-            value={`${auxiliary?.operationalRisk ?? 0} pendências`}
+            value={
+              <>
+                <AnimatedNumber
+                  value={auxiliary?.operationalRisk ?? 0}
+                  animationKey={dashboardAnimationKey}
+                />{' '}
+                pendências
+              </>
+            }
             danger={(auxiliary?.operationalRisk ?? 0) > 0}
             onAction={openRiskModal}
             actionTitle="Ver pendências"
@@ -420,9 +439,17 @@ function Dashboard({ onNavigate }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stages.map((stage) => (
           <StatCard
-            key={stage.key}
+            key={`${stage.key}-${dashboardAnimationKey}`}
             label={stage.label}
-            value={`${stage.realizado} / ${stage.meta}`}
+            value={
+              <>
+                <AnimatedNumber
+                  value={stage.realizado}
+                  animationKey={dashboardAnimationKey}
+                />{' '}
+                <span className="text-zinc-500">/ {stage.meta}</span>
+              </>
+            }
             meta={`${stage.percentual}%`}
             detail={`${stage.faltante} faltando para a meta`}
             progress={stage.percentual}
@@ -431,11 +458,18 @@ function Dashboard({ onNavigate }) {
             onIconClick={() => openStageDrilldown(stage)}
             onDoubleClick={() => openStageDrilldown(stage)}
             iconTitle="Ver leads"
+            animationKey={dashboardAnimationKey}
           />
         ))}
         <StatCard
+          key={`overdue-${dashboardAnimationKey}`}
           label="Follow-ups vencidos"
-          value={String(auxiliary?.overdueFollowUps ?? 0)}
+          value={
+            <AnimatedNumber
+              value={auxiliary?.overdueFollowUps ?? 0}
+              animationKey={dashboardAnimationKey}
+            />
+          }
           detail="Leads ativos com contato atrasado"
           progress={Math.min((auxiliary?.overdueFollowUps ?? 0) * 10, 100)}
           icon={AlertTriangle}
@@ -443,10 +477,17 @@ function Dashboard({ onNavigate }) {
           onIconClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
           onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
           iconTitle="Ver leads"
+          animationKey={dashboardAnimationKey}
         />
         <StatCard
+          key={`caveira-${dashboardAnimationKey}`}
           label="Leads Caveira"
-          value={String(auxiliary?.caveiraLeads ?? 0)}
+          value={
+            <AnimatedNumber
+              value={auxiliary?.caveiraLeads ?? 0}
+              animationKey={dashboardAnimationKey}
+            />
+          }
           detail="Leads quentes ainda em jogo"
           progress={Math.min((auxiliary?.caveiraLeads ?? 0) * 10, 100)}
           icon={Flame}
@@ -454,10 +495,17 @@ function Dashboard({ onNavigate }) {
           onIconClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
           onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
           iconTitle="Ver leads"
+          animationKey={dashboardAnimationKey}
         />
         <StatCard
+          key={`mission-${dashboardAnimationKey}`}
           label="Missão do Dia"
-          value={String(auxiliary?.todayMission ?? 0)}
+          value={
+            <AnimatedNumber
+              value={auxiliary?.todayMission ?? 0}
+              animationKey={dashboardAnimationKey}
+            />
+          }
           detail="Leads com próximo contato hoje"
           progress={Math.min((auxiliary?.todayMission ?? 0) * 10, 100)}
           icon={BadgeCheck}
@@ -465,28 +513,40 @@ function Dashboard({ onNavigate }) {
           onIconClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
           onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
           iconTitle="Ver leads"
+          animationKey={dashboardAnimationKey}
         />
       </div>
 
-      <WarRhythmCard rhythm={warRhythm} />
+      <WarRhythmCard
+        key={`rhythm-${dashboardAnimationKey}`}
+        rhythm={warRhythm}
+        animationKey={dashboardAnimationKey}
+      />
 
       <div className="grid gap-4 xl:grid-cols-2">
         <DonutChartCard
+          key={`stage-chart-${dashboardAnimationKey}`}
           title="Distribuição por etapa"
           subtitle="Realizado do mês por passagem no funil."
           data={stageDonutData}
           colors={stageChartColors}
+          animationKey={dashboardAnimationKey}
         />
         <DonutChartCard
+          key={`temperature-chart-${dashboardAnimationKey}`}
           title="Distribuição por temperatura"
           subtitle="Leads movimentados no período por temperatura."
           data={temperatureDonutData}
           colors={temperatureChartColors}
+          animationKey={dashboardAnimationKey}
         />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <article className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
+        <article
+          key={`pipeline-${dashboardAnimationKey}`}
+          className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-black text-white">Pipeline em combate</h2>
@@ -505,13 +565,18 @@ function Dashboard({ onNavigate }) {
                 <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                   <span className="font-extrabold text-zinc-300">{stage.label}</span>
                   <span className="font-black text-white">
-                    {stage.realizado} / {stage.meta}
+                    <AnimatedNumber
+                      value={stage.realizado}
+                      animationKey={dashboardAnimationKey}
+                    />{' '}
+                    <span className="text-zinc-500">/ {stage.meta}</span>
                   </span>
                 </div>
                 <div className="h-3 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
-                  <div
+                  <AnimatedProgressBar
+                    value={stage.percentual}
+                    animationKey={dashboardAnimationKey}
                     className="h-full rounded-full bg-gradient-to-r from-zinc-700 via-red-700 to-red-400 shadow-[0_0_18px_rgba(239,68,68,0.35)]"
-                    style={{ width: `${Math.min(stage.percentual, 100)}%` }}
                   />
                 </div>
               </div>
@@ -519,7 +584,10 @@ function Dashboard({ onNavigate }) {
           </div>
         </article>
 
-        <article className="rounded-lg border border-red-500/20 bg-red-950/15 p-5 shadow-xl shadow-red-950/10 backdrop-blur">
+        <article
+          key={`today-mission-${dashboardAnimationKey}`}
+          className="animate-dashboard-enter rounded-lg border border-red-500/20 bg-red-950/15 p-5 shadow-xl shadow-red-950/10 backdrop-blur"
+        >
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-md border border-red-500/30 bg-red-950/35 text-red-300">
               <CheckCircle2 size={22} />
@@ -545,7 +613,10 @@ function Dashboard({ onNavigate }) {
         </article>
       </div>
 
-      <article className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
+      <article
+        key={`priority-${dashboardAnimationKey}`}
+        className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-lg font-black text-white">Alvos Prioritários</h2>
@@ -902,7 +973,7 @@ function RiskLeadCard({ lead, onOpenLead }) {
   )
 }
 
-function WarRhythmCard({ rhythm }) {
+function WarRhythmCard({ rhythm, animationKey }) {
   const statusStyles = {
     atrasado: {
       label: 'Atrasado',
@@ -930,7 +1001,7 @@ function WarRhythmCard({ rhythm }) {
       : 0
 
   return (
-    <article className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur">
+    <article className="animate-dashboard-enter overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur">
       <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:items-center">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
@@ -963,30 +1034,40 @@ function WarRhythmCard({ rhythm }) {
               <span>{progress}%</span>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
-              <div
+              <AnimatedProgressBar
+                value={progress}
+                animationKey={animationKey}
                 className={`h-full rounded-full bg-gradient-to-r ${style.bar} shadow-[0_0_18px_rgba(239,68,68,0.22)]`}
-                style={{ width: `${progress}%` }}
               />
             </div>
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <RhythmMetric label="Missão de hoje" value={rhythm.missaoHoje} highlight />
-          <RhythmMetric label="Realizado hoje" value={rhythm.realizadoHoje} />
-          <RhythmMetric label="Faltam hoje" value={rhythm.faltamHoje} danger={rhythm.faltamHoje > 0} />
-          <RhythmMetric label="Meta base diária" value={rhythm.metaBaseDiaria} />
-          <RhythmMetric label="Realizado acumulado" value={rhythm.realizadoAcumulado} />
-          <RhythmMetric label="Meta acumulada" value={rhythm.metaAcumulada} />
-          <RhythmMetric label="Saldo do ritmo" value={formatSignedNumber(rhythm.saldo)} danger={rhythm.saldo > 0} success={rhythm.saldo < 0} />
-          <RhythmMetric label="Dias úteis decorridos" value={`${rhythm.diasUteisDecorridos}/${rhythm.diasUteis}`} />
+          <RhythmMetric label="Missão de hoje" value={rhythm.missaoHoje} highlight animationKey={animationKey} />
+          <RhythmMetric label="Realizado hoje" value={rhythm.realizadoHoje} animationKey={animationKey} />
+          <RhythmMetric label="Faltam hoje" value={rhythm.faltamHoje} danger={rhythm.faltamHoje > 0} animationKey={animationKey} />
+          <RhythmMetric label="Meta base diária" value={rhythm.metaBaseDiaria} animationKey={animationKey} />
+          <RhythmMetric label="Realizado acumulado" value={rhythm.realizadoAcumulado} animationKey={animationKey} />
+          <RhythmMetric label="Meta acumulada" value={rhythm.metaAcumulada} animationKey={animationKey} />
+          <RhythmMetric label="Saldo do ritmo" value={rhythm.saldo} signed danger={rhythm.saldo > 0} success={rhythm.saldo < 0} animationKey={animationKey} />
+          <RhythmMetric label="Dias úteis decorridos" value={rhythm.diasUteisDecorridos} suffix={`/${rhythm.diasUteis}`} animationKey={animationKey} />
         </div>
       </div>
     </article>
   )
 }
 
-function RhythmMetric({ label, value, highlight = false, danger = false, success = false }) {
+function RhythmMetric({
+  label,
+  value,
+  highlight = false,
+  danger = false,
+  success = false,
+  signed = false,
+  suffix = '',
+  animationKey,
+}) {
   const valueClass = danger
     ? 'text-red-200'
     : success
@@ -994,6 +1075,9 @@ function RhythmMetric({ label, value, highlight = false, danger = false, success
       : highlight
         ? 'text-white'
         : 'text-zinc-100'
+  const numericValue = Number(value)
+  const canAnimate = Number.isFinite(numericValue)
+  const signPrefix = signed && numericValue > 0 ? '+' : signed && numericValue < 0 ? '-' : ''
 
   return (
     <div className={`min-w-0 rounded-lg border p-4 ${highlight ? 'border-red-500/25 bg-red-950/20' : 'border-white/10 bg-black/25'}`}>
@@ -1001,32 +1085,42 @@ function RhythmMetric({ label, value, highlight = false, danger = false, success
         {label}
       </p>
       <p className={`mt-2 break-words text-2xl font-black leading-none ${valueClass}`}>
-        {value}
+        {canAnimate ? (
+          <AnimatedNumber
+            value={Math.abs(numericValue)}
+            prefix={signPrefix}
+            suffix={suffix}
+            animationKey={animationKey}
+          />
+        ) : (
+          value
+        )}
       </p>
     </div>
   )
 }
 
-function DonutChartCard({ title, subtitle, data, colors }) {
+function DonutChartCard({ title, subtitle, data, colors, animationKey }) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const hasData = total > 0
+  const prefersReducedMotion = usePrefersReducedMotion()
 
   return (
-    <article className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
+    <article className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-lg font-black text-white">{title}</h2>
           <p className="mt-1 text-sm font-medium text-zinc-500">{subtitle}</p>
         </div>
         <span className="w-fit rounded-md border border-red-500/20 bg-red-950/20 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-red-200">
-          {total} total
+          <AnimatedNumber value={total} animationKey={animationKey} /> total
         </span>
       </div>
 
       {hasData ? (
         <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] md:items-center">
           <div className="relative h-64 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer key={animationKey} width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data}
@@ -1037,6 +1131,9 @@ function DonutChartCard({ title, subtitle, data, colors }) {
                   paddingAngle={3}
                   stroke="rgba(24,24,27,0.95)"
                   strokeWidth={4}
+                  isAnimationActive={!prefersReducedMotion}
+                  animationDuration={850}
+                  animationEasing="ease-out"
                 >
                   {data.map((item) => (
                     <Cell
@@ -1051,7 +1148,9 @@ function DonutChartCard({ title, subtitle, data, colors }) {
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <p className="text-3xl font-black leading-none text-white">{total}</p>
+                <p className="text-3xl font-black leading-none text-white">
+                  <AnimatedNumber value={total} animationKey={animationKey} />
+                </p>
                 <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-zinc-600">
                   Leads
                 </p>
@@ -1066,6 +1165,7 @@ function DonutChartCard({ title, subtitle, data, colors }) {
                 item={item}
                 total={total}
                 color={colors[item.label] ?? '#ef4444'}
+                animationKey={animationKey}
               />
             ))}
           </div>
@@ -1079,7 +1179,7 @@ function DonutChartCard({ title, subtitle, data, colors }) {
   )
 }
 
-function DonutLegendItem({ item, total, color }) {
+function DonutLegendItem({ item, total, color, animationKey }) {
   const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0
 
   return (
@@ -1092,7 +1192,9 @@ function DonutLegendItem({ item, total, color }) {
         <span className="truncate text-sm font-black text-zinc-200">{item.label}</span>
       </div>
       <div className="shrink-0 text-right">
-        <p className="text-sm font-black text-white">{item.value}</p>
+        <p className="text-sm font-black text-white">
+          <AnimatedNumber value={item.value} animationKey={animationKey} />
+        </p>
         <p className="text-[11px] font-black uppercase tracking-[0.12em] text-zinc-600">
           {percentage}%
         </p>
@@ -1536,14 +1638,6 @@ function getLocalISODate(date) {
   const day = String(date.getDate()).padStart(2, '0')
 
   return `${year}-${month}-${day}`
-}
-
-function formatSignedNumber(value) {
-  if (value > 0) {
-    return `+${value}`
-  }
-
-  return String(value)
 }
 
 function getTodayISODate() {
