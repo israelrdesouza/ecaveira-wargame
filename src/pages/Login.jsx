@@ -1,4 +1,13 @@
-import { ArrowLeft, Loader2, LockKeyhole, Mail, ShieldCheck, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 import logo from '../assets/ecaveira-logo.png'
 import { sendPasswordResetEmail } from '../services/authService'
@@ -9,6 +18,7 @@ function Login({ onBack, onSuccess, signIn }) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [isResetOpen, setIsResetOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetMessage, setResetMessage] = useState('')
@@ -143,7 +153,7 @@ function Login({ onBack, onSuccess, signIn }) {
               <span className="flex h-11 items-center gap-2 rounded-md border border-white/10 bg-black/30 px-3 transition focus-within:border-red-500">
                 <LockKeyhole size={16} className="shrink-0 text-zinc-500" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   autoComplete="current-password"
@@ -152,6 +162,15 @@ function Login({ onBack, onSuccess, signIn }) {
                   placeholder="Sua senha"
                   className="w-full min-w-0 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/5 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-300/30"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Visualizar senha'}
+                  title={showPassword ? 'Ocultar senha' : 'Visualizar senha'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </span>
             </label>
 
@@ -171,7 +190,7 @@ function Login({ onBack, onSuccess, signIn }) {
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-red-600 px-5 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_30px_rgba(220,38,38,0.28)] transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-red-600 px-5 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_30px_rgba(220,38,38,0.28)] transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {submitting && <Loader2 size={17} className="animate-spin" />}
               Entrar
