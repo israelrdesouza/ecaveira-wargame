@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const inviteRedirectTo = 'https://ecaveira-cockpit.vercel.app/reset-password'
+const inviteRedirectTo = 'https://ecaveira.linsprint.com.br/reset-password'
 
 type ResendInvitePayload = {
   user_id?: string

@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 const allowedProfiles = new Set(['admin', 'operador'])
-const inviteRedirectTo = 'https://ecaveira-cockpit.vercel.app/reset-password'
+const inviteRedirectTo = 'https://ecaveira.linsprint.com.br/reset-password'
 
 type CreateUserPayload = {
   nome?: string
