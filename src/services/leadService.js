@@ -57,15 +57,39 @@ function normalizeDateOnly(value) {
   return String(value).slice(0, 10)
 }
 
+// Aceita entradas em formato BR ("549,90", "1.549,90") e também em formato
+// numerico puro ("549.90", "1549.90", "549"), sem heuristica perigosa:
+// - se houver virgula, ela e sempre o separador decimal e os pontos sao
+//   tratados como separador de milhar (removidos);
+// - se houver apenas ponto(s) e o ultimo grupo tiver 1 ou 2 digitos, o
+//   ultimo ponto e tratado como separador decimal; caso contrario (ex.:
+//   "1.549" sem virgula) os pontos sao tratados como separador de milhar.
 function parseEstimatedValue(value) {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined) {
     return null
   }
 
-  const normalized = String(value)
-    .replace(/[^\d,.-]/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.')
+  const trimmed = String(value).trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  const cleaned = trimmed.replace(/[^\d,.-]/g, '')
+  const hasComma = cleaned.includes(',')
+  const hasDot = cleaned.includes('.')
+
+  let normalized = cleaned
+
+  if (hasComma) {
+    normalized = cleaned.replace(/\./g, '').replace(',', '.')
+  } else if (hasDot) {
+    const dotParts = cleaned.split('.')
+    const lastPart = dotParts[dotParts.length - 1]
+    const isDecimalDot = dotParts.length === 2 && lastPart.length <= 2
+
+    normalized = isDecimalDot ? cleaned : cleaned.replace(/\./g, '')
+  }
 
   const numericValue = Number(normalized)
 
@@ -159,6 +183,7 @@ function mapEditFormToLeadPayload(form) {
     produto,
     origem,
     temperatura,
+    etapa_atual: normalizeStage(form.etapa),
     proximo_contato: normalizeDateOnly(form.proximo_contato),
     proxima_acao: normalizeOptionalText(form.proxima_acao),
     observacao: normalizeOptionalText(form.observacao),
