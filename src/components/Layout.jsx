@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import BottomNav from './BottomNav'
+import MobileAppHeader from './mobile/MobileAppHeader'
 import MobileMoreMenu from './mobile/MobileMoreMenu'
 import Sidebar from './Sidebar'
 
@@ -74,6 +75,12 @@ function Layout({
         onProfileUpdated={onProfileUpdated}
         collapsed={isSidebarCollapsed}
         onToggleCollapsed={toggleSidebarCollapsed}
+      />
+
+      <MobileAppHeader currentPage={currentPage} />
+      <div
+        aria-hidden="true"
+        className="h-[calc(2.375rem+max(env(safe-area-inset-top),0.625rem))] lg:hidden"
       />
 
       <main
