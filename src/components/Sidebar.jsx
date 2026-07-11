@@ -1,5 +1,4 @@
 ﻿import {
-  Bell,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -8,7 +7,7 @@
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   PasswordField,
@@ -29,7 +28,7 @@ import { updateOwnProfile } from '../services/profileService'
 import { formatCurrencyBRLWithCents, formatDateTimeBR } from '../utils/formatters'
 import { normalizeText } from '../utils/normalizers'
 
-function Sidebar({
+const Sidebar = forwardRef(function Sidebar({
   currentPage,
   navItems,
   onNavigate,
@@ -39,7 +38,7 @@ function Sidebar({
   onProfileUpdated,
   collapsed = false,
   onToggleCollapsed,
-}) {
+}, ref) {
   const currentPeriod = useMemo(() => getCurrentPeriod(), [])
   const currentYear = currentPeriod.ano
   const [annualGoal, setAnnualGoal] = useState(null)
@@ -282,6 +281,15 @@ function Sidebar({
     }
   }
 
+  // Expõe as aberturas de modal já existentes para quem monta a Sidebar
+  // (Layout), sem duplicar estado/lógica: o menu "Mais" do mobile chama
+  // estas mesmas funções através de uma ref (v2.3.0 — Navegação Mobile
+  // Premium).
+  useImperativeHandle(ref, () => ({
+    openProfileModal,
+    openNotificationsModal,
+  }))
+
   return (
     <>
       <aside
@@ -325,22 +333,6 @@ function Sidebar({
         <SidebarFooter collapsed={collapsed} onSignOut={onSignOut} />
         </div>
       </aside>
-
-      {isAdmin && (
-        <button
-          type="button"
-          onClick={openNotificationsModal}
-          title="Notificações"
-          className="fixed right-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-zinc-950/85 text-zinc-300 shadow-2xl shadow-black/40 backdrop-blur-xl transition hover:border-red-500/35 hover:text-red-200 lg:hidden"
-        >
-          <Bell size={17} />
-          {notifications.length > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-zinc-950 bg-red-600 px-1 text-[10px] font-black leading-none text-white shadow-[0_0_14px_rgba(220,38,38,0.55)]">
-              {notifications.length > 9 ? '9+' : notifications.length}
-            </span>
-          )}
-        </button>
-      )}
 
       {isModalOpen &&
         createPortal(
@@ -387,7 +379,7 @@ function Sidebar({
         )}
     </>
   )
-}
+})
 
 function NotificationsModal({
   notifications,

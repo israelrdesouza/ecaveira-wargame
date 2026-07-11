@@ -1,6 +1,6 @@
-import { LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import BottomNav from './BottomNav'
+import MobileMoreMenu from './mobile/MobileMoreMenu'
 import Sidebar from './Sidebar'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'ecaveira:sidebar-collapsed'
@@ -34,6 +34,10 @@ function Layout({
   onProfileUpdated,
 }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed)
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
+  const sidebarRef = useRef(null)
+  const isAdmin = profile?.perfil === 'admin'
+  const mobileNavItems = navItems.filter((item) => item.id !== 'reports')
 
   function toggleSidebarCollapsed() {
     setIsSidebarCollapsed((current) => {
@@ -41,6 +45,14 @@ function Layout({
       persistSidebarCollapsed(next)
       return next
     })
+  }
+
+  function openMoreMenu() {
+    setIsMoreMenuOpen(true)
+  }
+
+  function closeMoreMenu() {
+    setIsMoreMenuOpen(false)
   }
 
   return (
@@ -52,6 +64,7 @@ function Layout({
       </div>
 
       <Sidebar
+        ref={sidebarRef}
         currentPage={currentPage}
         navItems={sidebarNavItems}
         onNavigate={onNavigate}
@@ -68,23 +81,25 @@ function Layout({
           isSidebarCollapsed ? 'lg:ml-[var(--sidebar-w-collapsed)]' : 'lg:ml-[var(--sidebar-w-expanded)]'
         }`}
       >
-        <div className="mb-4 flex justify-end lg:hidden">
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-white/10 bg-zinc-950/70 px-3 text-xs font-black uppercase tracking-[0.12em] text-zinc-300 backdrop-blur transition hover:border-red-500/35 hover:text-white"
-          >
-            <LogOut size={15} />
-            Sair
-          </button>
-        </div>
         <div className="mx-auto w-full max-w-7xl min-w-0">{children}</div>
       </main>
 
       <BottomNav
+        items={mobileNavItems}
         currentPage={currentPage}
-        navItems={navItems}
         onNavigate={onNavigate}
+        onOpenMore={openMoreMenu}
+        isMoreOpen={isMoreMenuOpen}
+      />
+
+      <MobileMoreMenu
+        isOpen={isMoreMenuOpen}
+        onClose={closeMoreMenu}
+        onNavigate={onNavigate}
+        isAdmin={isAdmin}
+        onOpenProfile={() => sidebarRef.current?.openProfileModal()}
+        onOpenNotifications={() => sidebarRef.current?.openNotificationsModal()}
+        onSignOut={onSignOut}
       />
     </div>
   )
