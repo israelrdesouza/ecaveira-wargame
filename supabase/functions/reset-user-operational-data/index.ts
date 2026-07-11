@@ -16,9 +16,10 @@ type ResetPayload = {
   months?: number[]
 }
 
-type DateRange = {
-  start: string
-  end: string
+type ResetRpcResult = {
+  leads_apagados: number
+  historico_apagado: number
+  metas_apagadas: number
 }
 
 serve(async (req) => {
@@ -85,6 +86,12 @@ serve(async (req) => {
     .maybeSingle()
 
   if (callerProfileError || !callerProfile) {
+    console.error('reset-user-operational-data caller profile lookup failed', {
+      callerId: caller.id,
+      code: callerProfileError?.code,
+      message: callerProfileError?.message,
+      profileFound: Boolean(callerProfile),
+    })
     return jsonResponse(
       { success: false, message: 'Perfil do usuário autenticado não encontrado.' },
       403,
@@ -118,7 +125,7 @@ serve(async (req) => {
   const targetUserId = String(payload.user_id).trim()
   const year = Number(payload.year)
   const mode = payload.mode as ResetMode
-  const months = mode === 'months' ? normalizeMonths(payload.months) : []
+  const months = mode === 'months' ? normalizeMonths(payload.months) : null
 
   const { data: targetProfile, error: targetProfileError } = await adminClient
     .from('profiles')
@@ -130,93 +137,25 @@ serve(async (req) => {
     return jsonResponse({ success: false, message: 'Usuário selecionado não encontrado.' }, 404)
   }
 
-  const ranges = mode === 'year'
-    ? [getYearRange(year)]
-    : months.map((month) => getMonthRange(year, month))
-  let leadIds: string[]
+  const { data: rpcData, error: rpcError } = await adminClient
+    .rpc('reiniciar_dados_operacionais', {
+      p_target_user_id: targetUserId,
+      p_mode: mode,
+      p_year: year,
+      p_months: months,
+    })
+    .maybeSingle<ResetRpcResult>()
 
-  try {
-    leadIds = await getLeadIdsForRanges(adminClient, targetUserId, ranges)
-  } catch (error) {
-    console.error('reset-user-operational-data getLeadIdsForRanges failed', {
+  if (rpcError || !rpcData) {
+    console.error('reset-user-operational-data reiniciar_dados_operacionais rpc failed', {
       targetUserId,
       mode,
       year,
-      message: error instanceof Error ? error.message : String(error),
+      code: rpcError?.code,
+      message: rpcError?.message,
     })
     return jsonResponse(
-      { success: false, message: 'Não foi possível identificar os leads do período.' },
-      500,
-    )
-  }
-  let deletedHistoryCount = 0
-  let deletedLeadsCount = 0
-
-  for (const chunk of chunkArray(leadIds, 100)) {
-    const { count: historyCount, error: historyError } = await adminClient
-      .from('historico_leads')
-      .delete({ count: 'exact' })
-      .eq('user_id', targetUserId)
-      .in('lead_id', chunk)
-
-    if (historyError) {
-      console.error('reset-user-operational-data historico_leads delete failed', {
-        targetUserId,
-        chunkSize: chunk.length,
-        code: historyError.code,
-        message: historyError.message,
-      })
-      return jsonResponse(
-        { success: false, message: 'Não foi possível apagar o histórico dos leads.' },
-        500,
-      )
-    }
-
-    deletedHistoryCount += historyCount ?? 0
-
-    const { count: leadsCount, error: leadsError } = await adminClient
-      .from('leads')
-      .delete({ count: 'exact' })
-      .eq('user_id', targetUserId)
-      .in('id', chunk)
-
-    if (leadsError) {
-      console.error('reset-user-operational-data leads delete failed', {
-        targetUserId,
-        chunkSize: chunk.length,
-        code: leadsError.code,
-        message: leadsError.message,
-      })
-      return jsonResponse(
-        { success: false, message: 'Não foi possível apagar os leads do período.' },
-        500,
-      )
-    }
-
-    deletedLeadsCount += leadsCount ?? 0
-  }
-
-  const metasDelete = adminClient
-    .from('metas')
-    .delete({ count: 'exact' })
-    .eq('user_id', targetUserId)
-    .eq('ano', year)
-
-  const { count: metasCount, error: metasError } =
-    mode === 'year'
-      ? await metasDelete
-      : await metasDelete.in('mes', months)
-
-  if (metasError) {
-    console.error('reset-user-operational-data metas delete failed', {
-      targetUserId,
-      mode,
-      year,
-      code: metasError.code,
-      message: metasError.message,
-    })
-    return jsonResponse(
-      { success: false, message: 'Não foi possível apagar as metas mensais do período.' },
+      { success: false, message: 'Não foi possível reiniciar os dados operacionais.' },
       500,
     )
   }
@@ -226,9 +165,9 @@ serve(async (req) => {
       success: true,
       message: 'Dados operacionais reiniciados com sucesso.',
       deleted: {
-        historico_leads: deletedHistoryCount,
-        leads: deletedLeadsCount,
-        metas: metasCount ?? 0,
+        historico_leads: rpcData.historico_apagado,
+        leads: rpcData.leads_apagados,
+        metas: rpcData.metas_apagadas,
       },
     },
     200,
@@ -286,60 +225,4 @@ function normalizeMonths(months?: number[]) {
     .map(Number)
     .filter((month) => Number.isInteger(month) && month >= 1 && month <= 12)
     .sort((first, second) => first - second)
-}
-
-function getYearRange(year: number): DateRange {
-  return {
-    start: `${year}-01-01T00:00:00.000Z`,
-    end: `${year + 1}-01-01T00:00:00.000Z`,
-  }
-}
-
-function getMonthRange(year: number, month: number): DateRange {
-  const nextYear = month === 12 ? year + 1 : year
-  const nextMonth = month === 12 ? 1 : month + 1
-
-  return {
-    start: `${year}-${String(month).padStart(2, '0')}-01T00:00:00.000Z`,
-    end: `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00.000Z`,
-  }
-}
-
-async function getLeadIdsForRanges(
-  adminClient: ReturnType<typeof createClient>,
-  userId: string,
-  ranges: DateRange[],
-) {
-  const ids = new Set<string>()
-
-  for (const range of ranges) {
-    const { data, error } = await adminClient
-      .from('leads')
-      .select('id')
-      .eq('user_id', userId)
-      .gte('created_at', range.start)
-      .lt('created_at', range.end)
-
-    if (error) {
-      throw error
-    }
-
-    for (const lead of data ?? []) {
-      if (lead.id) {
-        ids.add(lead.id)
-      }
-    }
-  }
-
-  return [...ids]
-}
-
-function chunkArray<T>(items: T[], size: number) {
-  const chunks: T[][] = []
-
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size))
-  }
-
-  return chunks
 }
