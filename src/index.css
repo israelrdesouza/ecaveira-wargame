@@ -37,6 +37,16 @@
   --container-content: 64rem;
 }
 
+/*
+ * Larguras da Sidebar recolhível (desktop). Fora do @theme porque não
+ * mapeiam para uma categoria de utilitária do Tailwind — são consumidas
+ * via sintaxe de valor arbitrário (ex.: w-[var(--sidebar-w-expanded)]).
+ */
+:root {
+  --sidebar-w-expanded: 17rem;
+  --sidebar-w-collapsed: 4.75rem;
+}
+
 @keyframes dashboard-enter {
   from {
     opacity: 0;

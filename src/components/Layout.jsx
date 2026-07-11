@@ -1,6 +1,26 @@
 import { LogOut } from 'lucide-react'
+import { useState } from 'react'
 import BottomNav from './BottomNav'
 import Sidebar from './Sidebar'
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'ecaveira:sidebar-collapsed'
+
+function readStoredSidebarCollapsed() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function persistSidebarCollapsed(value) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(value))
+  } catch {
+    // Preferência não pôde ser salva (ex.: localStorage indisponível);
+    // a navegação continua funcionando normalmente.
+  }
+}
 
 function Layout({
   children,
@@ -13,6 +33,16 @@ function Layout({
   profile,
   onProfileUpdated,
 }) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed)
+
+  function toggleSidebarCollapsed() {
+    setIsSidebarCollapsed((current) => {
+      const next = !current
+      persistSidebarCollapsed(next)
+      return next
+    })
+  }
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#07080a] text-zinc-100 antialiased">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -29,9 +59,15 @@ function Layout({
         user={user}
         profile={profile}
         onProfileUpdated={onProfileUpdated}
+        collapsed={isSidebarCollapsed}
+        onToggleCollapsed={toggleSidebarCollapsed}
       />
 
-      <main className="relative min-h-screen min-w-0 px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:ml-72 lg:px-8 lg:py-8">
+      <main
+        className={`relative min-h-screen min-w-0 px-4 pb-24 pt-4 transition-[margin] duration-[var(--duration-base)] ease-out sm:px-6 sm:pt-6 lg:px-8 lg:py-8 ${
+          isSidebarCollapsed ? 'lg:ml-[var(--sidebar-w-collapsed)]' : 'lg:ml-[var(--sidebar-w-expanded)]'
+        }`}
+      >
         <div className="mb-4 flex justify-end lg:hidden">
           <button
             type="button"
