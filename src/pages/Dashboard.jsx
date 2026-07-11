@@ -1,18 +1,12 @@
 import {
-  Activity,
   AlertTriangle,
-  BadgeCheck,
   CalendarClock,
-  CheckCircle2,
   ChevronRight,
   Crosshair,
   Eye,
-  Flame,
   Handshake,
-  Info,
   Loader2,
   PhoneCall,
-  Plus,
   Radar,
   Trophy,
   X,
@@ -21,8 +15,10 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import AnimatedNumber, { usePrefersReducedMotion } from '../components/AnimatedNumber'
-import AnimatedProgressBar from '../components/AnimatedProgressBar'
-import StatCard from '../components/StatCard'
+import DashboardHeader from '../components/dashboard/DashboardHeader'
+import ExecutiveSummary from '../components/dashboard/ExecutiveSummary'
+import FunnelOverview from '../components/dashboard/FunnelOverview'
+import OperationalFocus from '../components/dashboard/OperationalFocus'
 import { useAuth } from '../hooks/useAuth'
 import { getDashboardData } from '../services/dashboardService'
 import { updateLead } from '../services/leadService'
@@ -188,6 +184,7 @@ function Dashboard({ onNavigate }) {
   const warRhythm = getWarRhythm(dashboardData?.goal, leads, mes, ano)
   const stageDonutData = getStageDonutData(stages)
   const temperatureDonutData = getTemperatureDonutData(leads, mes, ano)
+  const fechamentosStage = stages.find((stage) => stage.key === 'fechamentos')
 
   function openDrilldown(config) {
     if (!config) {
@@ -356,67 +353,12 @@ function Dashboard({ onNavigate }) {
 
   return (
     <section className="space-y-5 sm:space-y-6">
-      <header className="overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-2xl shadow-black/25 backdrop-blur">
-        <div className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:p-6">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">
-              Painel real do cockpit
-            </p>
-            <h1 className="mt-2 max-w-full text-balance text-3xl font-black leading-[0.95] tracking-tight text-white sm:text-4xl xl:text-5xl">
-              <span className="block xl:inline">QG COCKPIT</span>
-              <span className="hidden xl:inline"> — </span>
-              <span className="block xl:inline">GUERRA COMERCIAL</span>
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-zinc-400">
-              Metas, pipeline, follow-ups e estratégia comercial em tempo real.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('newLead')}
-            title="Novo alvo"
-            aria-label="Novo alvo"
-            className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-red-400/35 bg-red-600 text-white shadow-lg shadow-red-950/35 transition hover:scale-105 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-300/50 sm:h-14 sm:w-14 md:h-16 md:w-16 md:justify-self-end"
-          >
-            <Plus className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.8} />
-          </button>
-        </div>
-        <div className="grid border-t border-white/10 bg-black/20 sm:grid-cols-3">
-          <HeaderSignal
-            label="Receita em jogo"
-            value={
-              <AnimatedNumber
-                value={auxiliary?.revenueInPlay ?? 0}
-                format={formatCurrencyBRL}
-                animationKey={dashboardAnimationKey}
-              />
-            }
-          />
-          <HeaderSignal
-            label="Período"
-            value={`${String(mes).padStart(2, '0')}/${ano}`}
-            onAction={openPeriodModal}
-            actionTitle="Selecionar período"
-            actionIcon={CalendarClock}
-          />
-          <HeaderSignal
-            label="Risco operacional"
-            value={
-              <>
-                <AnimatedNumber
-                  value={auxiliary?.operationalRisk ?? 0}
-                  animationKey={dashboardAnimationKey}
-                />{' '}
-                pendências
-              </>
-            }
-            danger={(auxiliary?.operationalRisk ?? 0) > 0}
-            onAction={openRiskModal}
-            actionTitle="Ver pendências"
-          />
-        </div>
-      </header>
+      <DashboardHeader
+        mes={mes}
+        ano={ano}
+        onOpenPeriod={openPeriodModal}
+        onCreateLead={() => onNavigate('newLead')}
+      />
 
       {isLoading && (
         <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900/70 p-4 text-sm font-semibold text-zinc-400 shadow-xl shadow-black/20 backdrop-blur">
@@ -437,102 +379,37 @@ function Dashboard({ onNavigate }) {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stages.map((stage, index) => (
-          <StatCard
-            key={`${stage.key}-${dashboardAnimationKey}`}
-            label={stage.label}
-            value={
-              <>
-                <AnimatedNumber
-                  value={stage.realizado}
-                  animationKey={dashboardAnimationKey}
-                />{' '}
-                <span className="text-zinc-500">/ {stage.meta}</span>
-              </>
-            }
-            meta={
-              <AnimatedNumber
-                value={stage.percentual}
-                suffix="%"
-                animationKey={dashboardAnimationKey}
-              />
-            }
-            detail={`${stage.faltante} faltando para a meta`}
-            progress={stage.percentual}
-            icon={stageIconMap[stage.key]}
-            accent={stageAccentMap[stage.key]}
-            onIconClick={() => openStageDrilldown(stage)}
-            onDoubleClick={() => openStageDrilldown(stage)}
-            iconTitle="Ver leads"
-            animationKey={dashboardAnimationKey}
-            animationDelay={getDashboardStaggerDelay(index)}
-          />
-        ))}
-        <StatCard
-          key={`overdue-${dashboardAnimationKey}`}
-          label="Follow-ups vencidos"
-          value={
-            <AnimatedNumber
-              value={auxiliary?.overdueFollowUps ?? 0}
-              animationKey={dashboardAnimationKey}
-            />
-          }
-          detail="Leads ativos com contato atrasado"
-          progress={Math.min((auxiliary?.overdueFollowUps ?? 0) * 10, 100)}
-          icon={AlertTriangle}
-          accent="red"
-          onIconClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
-          onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.overdueFollowUps)}
-          iconTitle="Ver leads"
-          animationKey={dashboardAnimationKey}
-          animationDelay={getDashboardStaggerDelay(stages.length)}
-        />
-        <StatCard
-          key={`caveira-${dashboardAnimationKey}`}
-          label="Leads Caveira"
-          value={
-            <AnimatedNumber
-              value={auxiliary?.caveiraLeads ?? 0}
-              animationKey={dashboardAnimationKey}
-            />
-          }
-          detail="Leads quentes ainda em jogo"
-          progress={Math.min((auxiliary?.caveiraLeads ?? 0) * 10, 100)}
-          icon={Flame}
-          accent="red"
-          onIconClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
-          onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
-          iconTitle="Ver leads"
-          animationKey={dashboardAnimationKey}
-          animationDelay={getDashboardStaggerDelay(stages.length + 1)}
-        />
-        <StatCard
-          key={`mission-${dashboardAnimationKey}`}
-          label="Missão do Dia"
-          value={
-            <AnimatedNumber
-              value={auxiliary?.todayMission ?? 0}
-              animationKey={dashboardAnimationKey}
-            />
-          }
-          detail="Leads com próximo contato hoje"
-          progress={Math.min((auxiliary?.todayMission ?? 0) * 10, 100)}
-          icon={BadgeCheck}
-          accent="zinc"
-          onIconClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
-          onDoubleClick={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
-          iconTitle="Ver leads"
-          animationKey={dashboardAnimationKey}
-          animationDelay={getDashboardStaggerDelay(stages.length + 2)}
-        />
-      </div>
-
-      <WarRhythmCard
-        key={`rhythm-${dashboardAnimationKey}`}
-        rhythm={warRhythm}
+      <ExecutiveSummary
+        fechamentosRealizado={fechamentosStage?.realizado ?? 0}
+        fechamentosMeta={fechamentosStage?.meta ?? 0}
+        fechamentosPercentual={fechamentosStage?.percentual ?? 0}
+        fechamentosFaltante={fechamentosStage?.faltante ?? 0}
+        pipelineEmJogo={auxiliary?.revenueInPlay ?? 0}
         animationKey={dashboardAnimationKey}
-        animationDelay={getDashboardStaggerDelay(stages.length + 3)}
+        animationDelay={getDashboardStaggerDelay(0)}
+      />
+
+      <OperationalFocus
+        rhythm={warRhythm}
+        overdueFollowUps={auxiliary?.overdueFollowUps ?? 0}
+        caveiraLeads={auxiliary?.caveiraLeads ?? 0}
+        missionLeads={lists?.todayMissionLeads ?? []}
+        onOpenOverdue={openRiskModal}
+        onOpenCaveira={() => openDrilldown(auxiliaryDrilldowns.caveiraLeads)}
+        onSeeAllMissions={() => openDrilldown(auxiliaryDrilldowns.todayMission)}
+        animationKey={dashboardAnimationKey}
+        animationDelay={getDashboardStaggerDelay(1)}
+      />
+
+      <FunnelOverview
+        stages={stages}
+        stageIconMap={stageIconMap}
+        stageAccentMap={stageAccentMap}
+        mes={mes}
+        ano={ano}
+        onOpenStage={openStageDrilldown}
+        animationKey={dashboardAnimationKey}
+        animationDelay={getDashboardStaggerDelay(2)}
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -543,7 +420,7 @@ function Dashboard({ onNavigate }) {
           data={stageDonutData}
           colors={stageChartColors}
           animationKey={dashboardAnimationKey}
-          animationDelay={getDashboardStaggerDelay(stages.length + 4)}
+          animationDelay={getDashboardStaggerDelay(3)}
         />
         <DonutChartCard
           key={`temperature-chart-${dashboardAnimationKey}`}
@@ -552,87 +429,14 @@ function Dashboard({ onNavigate }) {
           data={temperatureDonutData}
           colors={temperatureChartColors}
           animationKey={dashboardAnimationKey}
-          animationDelay={getDashboardStaggerDelay(stages.length + 5)}
+          animationDelay={getDashboardStaggerDelay(4)}
         />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <article
-          key={`pipeline-${dashboardAnimationKey}`}
-          style={{ animationDelay: `${getDashboardStaggerDelay(stages.length + 6)}ms` }}
-          className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-white">Pipeline em combate</h2>
-              <p className="mt-1 text-sm font-medium text-zinc-500">
-                Realizado do mês por data de passagem em cada etapa.
-              </p>
-            </div>
-            <span className="w-fit rounded-md border border-red-500/25 bg-red-950/25 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-red-300">
-              {String(mes).padStart(2, '0')}/{ano}
-            </span>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            {stages.map((stage) => (
-              <div key={stage.key}>
-                <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                  <span className="font-extrabold text-zinc-300">{stage.label}</span>
-                  <span className="font-black text-white">
-                    <AnimatedNumber
-                      value={stage.realizado}
-                      animationKey={dashboardAnimationKey}
-                    />{' '}
-                    <span className="text-zinc-500">/ {stage.meta}</span>
-                  </span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
-                  <AnimatedProgressBar
-                    value={stage.percentual}
-                    animationKey={dashboardAnimationKey}
-                    className="h-full rounded-full bg-gradient-to-r from-zinc-700 via-red-700 to-red-400 shadow-[0_0_18px_rgba(239,68,68,0.35)]"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article
-          key={`today-mission-${dashboardAnimationKey}`}
-          style={{ animationDelay: `${getDashboardStaggerDelay(stages.length + 7)}ms` }}
-          className="animate-dashboard-enter rounded-lg border border-red-500/20 bg-red-950/15 p-5 shadow-xl shadow-red-950/10 backdrop-blur"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-md border border-red-500/30 bg-red-950/35 text-red-300">
-              <CheckCircle2 size={22} />
-            </span>
-            <div>
-              <h2 className="text-lg font-black text-white">Missão do Dia</h2>
-              <p className="mt-1 text-sm font-medium text-red-100/60">
-                Leads com contato marcado para hoje.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {(lists?.todayMissionLeads ?? []).slice(0, 4).map((lead) => (
-              <MissionItem key={lead.id} lead={lead} />
-            ))}
-            {(lists?.todayMissionLeads?.length ?? 0) === 0 && (
-              <p className="rounded-md border border-white/10 bg-black/25 p-3 text-sm font-semibold text-zinc-400">
-                Nenhuma missão marcada para hoje.
-              </p>
-            )}
-          </div>
-        </article>
       </div>
 
       <article
         key={`priority-${dashboardAnimationKey}`}
-        style={{ animationDelay: `${getDashboardStaggerDelay(stages.length + 8)}ms` }}
-        className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
+        style={{ animationDelay: `${getDashboardStaggerDelay(5)}ms` }}
+        className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-lg shadow-black/20 backdrop-blur"
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -707,43 +511,6 @@ function Dashboard({ onNavigate }) {
         />
       )}
     </section>
-  )
-}
-
-function HeaderSignal({
-  label,
-  value,
-  danger = false,
-  onAction,
-  actionTitle,
-  actionIcon: ActionIcon = Info,
-}) {
-  return (
-    <div className="min-w-0 border-white/10 px-5 py-4 sm:border-r sm:last:border-r-0">
-      <div className="flex items-center gap-2">
-        <p className="break-words text-xs font-black uppercase leading-4 tracking-[0.14em] text-zinc-600">
-          {label}
-        </p>
-        {onAction && (
-          <button
-            type="button"
-            onClick={onAction}
-            title={actionTitle}
-            aria-label={actionTitle}
-            className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-500/20 bg-red-950/10 text-red-300 transition hover:border-red-400/40 hover:bg-red-950/25 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-300/35"
-          >
-            <ActionIcon size={14} />
-          </button>
-        )}
-      </div>
-      <p
-        className={`mt-1 break-words text-lg font-black leading-tight sm:text-xl ${
-          danger ? 'text-red-300' : 'text-white'
-        }`}
-      >
-        {value}
-      </p>
-    </div>
   )
 }
 
@@ -990,142 +757,6 @@ function RiskLeadCard({ lead, onOpenLead }) {
   )
 }
 
-function WarRhythmCard({ rhythm, animationKey, animationDelay = 0 }) {
-  const statusStyles = {
-    atrasado: {
-      label: 'Atrasado',
-      badge: 'border-red-500/30 bg-red-950/30 text-red-100',
-      icon: 'text-red-300',
-      bar: 'from-red-700 via-red-500 to-red-300',
-    },
-    ritmo: {
-      label: 'No ritmo',
-      badge: 'border-emerald-500/25 bg-emerald-950/20 text-emerald-100',
-      icon: 'text-emerald-300',
-      bar: 'from-zinc-700 via-emerald-700 to-emerald-400',
-    },
-    adiantado: {
-      label: 'Adiantado',
-      badge: 'border-emerald-500/35 bg-emerald-950/25 text-emerald-100',
-      icon: 'text-emerald-300',
-      bar: 'from-emerald-800 via-emerald-600 to-emerald-300',
-    },
-  }
-  const style = statusStyles[rhythm.status] ?? statusStyles.ritmo
-  const progress =
-    rhythm.metaAcumulada > 0
-      ? Math.min(Math.round((rhythm.realizadoAcumulado / rhythm.metaAcumulada) * 100), 100)
-      : 0
-
-  return (
-    <article
-      style={{ animationDelay: `${animationDelay}ms` }}
-      className="animate-dashboard-enter overflow-hidden rounded-lg border border-white/10 bg-zinc-900/70 shadow-xl shadow-black/20 backdrop-blur"
-    >
-      <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:items-center">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/30 ${style.icon}`}>
-              <Activity size={22} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
-                Execução diária
-              </p>
-              <h2 className="mt-1 text-xl font-black text-white">
-                Ritmo de Guerra
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-zinc-500">
-                Controle diário da meta de Suspects.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span className={`rounded-md border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] ${style.badge}`}>
-              {style.label}
-            </span>
-            <p className="text-sm font-semibold text-zinc-400">{rhythm.supportText}</p>
-          </div>
-
-          <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.12em] text-zinc-600">
-              <span>Acumulado</span>
-              <span>
-                <AnimatedNumber
-                  value={progress}
-                  suffix="%"
-                  animationKey={animationKey}
-                />
-              </span>
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
-              <AnimatedProgressBar
-                value={progress}
-                animationKey={animationKey}
-                className={`h-full rounded-full bg-gradient-to-r ${style.bar} shadow-[0_0_18px_rgba(239,68,68,0.22)]`}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <RhythmMetric label="Missão de hoje" value={rhythm.missaoHoje} highlight animationKey={animationKey} />
-          <RhythmMetric label="Realizado hoje" value={rhythm.realizadoHoje} animationKey={animationKey} />
-          <RhythmMetric label="Faltam hoje" value={rhythm.faltamHoje} danger={rhythm.faltamHoje > 0} animationKey={animationKey} />
-          <RhythmMetric label="Meta base diária" value={rhythm.metaBaseDiaria} animationKey={animationKey} />
-          <RhythmMetric label="Realizado acumulado" value={rhythm.realizadoAcumulado} animationKey={animationKey} />
-          <RhythmMetric label="Meta acumulada" value={rhythm.metaAcumulada} animationKey={animationKey} />
-          <RhythmMetric label="Saldo do ritmo" value={rhythm.saldo} signed danger={rhythm.saldo > 0} success={rhythm.saldo < 0} animationKey={animationKey} />
-          <RhythmMetric label="Dias úteis decorridos" value={rhythm.diasUteisDecorridos} suffix={`/${rhythm.diasUteis}`} animationKey={animationKey} />
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function RhythmMetric({
-  label,
-  value,
-  highlight = false,
-  danger = false,
-  success = false,
-  signed = false,
-  suffix = '',
-  animationKey,
-}) {
-  const valueClass = danger
-    ? 'text-red-200'
-    : success
-      ? 'text-emerald-200'
-      : highlight
-        ? 'text-white'
-        : 'text-zinc-100'
-  const numericValue = Number(value)
-  const canAnimate = Number.isFinite(numericValue)
-  const signPrefix = signed && numericValue > 0 ? '+' : signed && numericValue < 0 ? '-' : ''
-
-  return (
-    <div className={`min-w-0 rounded-lg border p-4 ${highlight ? 'border-red-500/25 bg-red-950/20' : 'border-white/10 bg-black/25'}`}>
-      <p className="text-xs font-black uppercase leading-4 tracking-[0.12em] text-zinc-600">
-        {label}
-      </p>
-      <p className={`mt-2 break-words text-2xl font-black leading-none ${valueClass}`}>
-        {canAnimate ? (
-          <AnimatedNumber
-            value={Math.abs(numericValue)}
-            prefix={signPrefix}
-            suffix={suffix}
-            animationKey={animationKey}
-          />
-        ) : (
-          value
-        )}
-      </p>
-    </div>
-  )
-}
-
 function DonutChartCard({
   title,
   subtitle,
@@ -1141,7 +772,7 @@ function DonutChartCard({
   return (
     <article
       style={{ animationDelay: `${animationDelay}ms` }}
-      className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur"
+      className="animate-dashboard-enter rounded-lg border border-white/10 bg-zinc-900/70 p-5 shadow-lg shadow-black/20 backdrop-blur"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -1155,7 +786,7 @@ function DonutChartCard({
 
       {hasData ? (
         <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] md:items-center">
-          <div className="relative h-64 min-w-0">
+          <div className="relative h-56 min-w-0">
             <ResponsiveContainer key={animationKey} width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1256,17 +887,6 @@ function DonutTooltip({ active, payload, total }) {
       <p className="font-black text-white">{item.label}</p>
       <p className="mt-1 font-semibold text-zinc-400">
         {item.value} registros · {percentage}%
-      </p>
-    </div>
-  )
-}
-
-function MissionItem({ lead }) {
-  return (
-    <div className="min-w-0 rounded-md border border-white/10 bg-black/25 p-3">
-      <p className="break-words text-sm font-black text-white">{lead.empresa}</p>
-      <p className="mt-1 text-xs font-semibold text-zinc-500">
-        {lead.proxima_acao || lead.ultima_acao || 'Contato comercial'}
       </p>
     </div>
   )
