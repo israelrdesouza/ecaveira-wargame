@@ -24,7 +24,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY')
 
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return jsonResponse(
@@ -177,6 +177,12 @@ serve(async (req) => {
   const { error: deleteAuthError } = await adminClient.auth.admin.deleteUser(targetUserId)
 
   if (deleteAuthError) {
+    console.error('delete-user auth.admin.deleteUser failed', {
+      targetUserId,
+      status: deleteAuthError.status,
+      code: deleteAuthError.code,
+      message: deleteAuthError.message,
+    })
     return jsonResponse(
       { success: false, message: 'Não foi possível excluir o usuário.' },
       500,
@@ -195,3 +201,5 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
     },
   })
 }
+
+
