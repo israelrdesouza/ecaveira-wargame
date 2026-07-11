@@ -29,7 +29,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY')
 
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return jsonResponse(
@@ -82,6 +82,11 @@ serve(async (req) => {
     .maybeSingle()
 
   if (callerProfileError || !callerProfile) {
+    console.error('create-user caller profile lookup failed', {
+      callerId: caller.id,
+      error: callerProfileError,
+      profileFound: Boolean(callerProfile),
+    })
     return jsonResponse(
       { success: false, message: 'Perfil do usuário autenticado não encontrado.' },
       403,
@@ -291,3 +296,4 @@ function normalizeInviteUserError(message = '') {
 
   return 'Não foi possível enviar o convite.'
 }
+
