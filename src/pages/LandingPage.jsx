@@ -1,3 +1,4 @@
+import AppVersion from '../components/AppVersion'
 import BrandMark from '../components/BrandMark'
 import PageBackground from '../components/PageBackground'
 import Button from '../components/ui/Button'
@@ -27,6 +28,8 @@ function LandingPage({ onEnter }) {
           Entrar
         </Button>
       </section>
+
+      <AppVersion showDate className="absolute inset-x-0 bottom-4 text-center" />
     </main>
   )
 }

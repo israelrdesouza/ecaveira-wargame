@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import logo from '../assets/ecaveira-logo.png'
+import AppVersion from '../components/AppVersion'
 import { sendPasswordResetEmail } from '../services/authService'
 
 function Login({ onBack, onSuccess, signIn }) {
@@ -96,7 +97,7 @@ function Login({ onBack, onSuccess, signIn }) {
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-500/80 to-transparent" />
       </div>
 
-      <section className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-center py-10">
+      <section className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-center pb-16 pt-10">
         <button
           type="button"
           onClick={onBack}
@@ -285,6 +286,8 @@ function Login({ onBack, onSuccess, signIn }) {
           </form>
         </div>
       )}
+
+      <AppVersion showDate className="absolute inset-x-0 bottom-4 text-center" />
     </main>
   )
 }

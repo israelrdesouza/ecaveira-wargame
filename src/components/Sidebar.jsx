@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import logo from '../assets/ecaveira-logo.png'
+import AppVersion from './AppVersion'
 import {
   PasswordField,
   PasswordStrength,
@@ -480,6 +481,7 @@ function Sidebar({
             <LogOut size={15} />
             Sair
           </button>
+          <AppVersion className="text-center" />
         </div>
         </div>
       </aside>
