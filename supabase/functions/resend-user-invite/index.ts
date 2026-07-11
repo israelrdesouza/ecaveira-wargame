@@ -24,7 +24,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY')
 
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return jsonResponse(
@@ -138,6 +138,12 @@ serve(async (req) => {
   )
 
   if (inviteError) {
+    console.error('resend-user-invite auth.admin.inviteUserByEmail failed', {
+      targetUserId: targetProfile.id,
+      status: inviteError.status,
+      code: inviteError.code,
+      message: inviteError.message,
+    })
     return jsonResponse(
       { success: false, message: normalizeInviteError(inviteError.message) },
       inviteError.message?.toLowerCase().includes('already') ? 409 : 500,
@@ -158,6 +164,11 @@ serve(async (req) => {
     .eq('id', targetProfile.id)
 
   if (updateError) {
+    console.error('resend-user-invite profiles update failed', {
+      targetUserId: targetProfile.id,
+      code: updateError.code,
+      message: updateError.message,
+    })
     return jsonResponse(
       {
         success: false,

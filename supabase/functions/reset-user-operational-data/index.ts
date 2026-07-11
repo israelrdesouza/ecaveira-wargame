@@ -32,7 +32,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY')
 
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return jsonResponse(
@@ -137,7 +137,13 @@ serve(async (req) => {
 
   try {
     leadIds = await getLeadIdsForRanges(adminClient, targetUserId, ranges)
-  } catch {
+  } catch (error) {
+    console.error('reset-user-operational-data getLeadIdsForRanges failed', {
+      targetUserId,
+      mode,
+      year,
+      message: error instanceof Error ? error.message : String(error),
+    })
     return jsonResponse(
       { success: false, message: 'Não foi possível identificar os leads do período.' },
       500,
@@ -154,6 +160,12 @@ serve(async (req) => {
       .in('lead_id', chunk)
 
     if (historyError) {
+      console.error('reset-user-operational-data historico_leads delete failed', {
+        targetUserId,
+        chunkSize: chunk.length,
+        code: historyError.code,
+        message: historyError.message,
+      })
       return jsonResponse(
         { success: false, message: 'Não foi possível apagar o histórico dos leads.' },
         500,
@@ -169,6 +181,12 @@ serve(async (req) => {
       .in('id', chunk)
 
     if (leadsError) {
+      console.error('reset-user-operational-data leads delete failed', {
+        targetUserId,
+        chunkSize: chunk.length,
+        code: leadsError.code,
+        message: leadsError.message,
+      })
       return jsonResponse(
         { success: false, message: 'Não foi possível apagar os leads do período.' },
         500,
@@ -190,6 +208,13 @@ serve(async (req) => {
       : await metasDelete.in('mes', months)
 
   if (metasError) {
+    console.error('reset-user-operational-data metas delete failed', {
+      targetUserId,
+      mode,
+      year,
+      code: metasError.code,
+      message: metasError.message,
+    })
     return jsonResponse(
       { success: false, message: 'Não foi possível apagar as metas mensais do período.' },
       500,
